@@ -7,10 +7,11 @@ import scipy.constants
 import scipy.spatial
 import scipy.special
 import matplotlib.pyplot as plt
-import warnings
 from itertools import islice
 from datetime import datetime
 from pprint import pprint
+
+__version__ = "0.1.0"
 
 def cron(func, *args, **kwargs):
     """
@@ -1552,14 +1553,11 @@ class calculation():  #classe principale
 
         return matrix
 
+
 #======================= NEW FUNCTIONS for MAGNETIC PROPERTIES ==============================
 
-from numba import jit, njit
-from numba import complex128, boolean, float64, int32, int64
-import numba
 from itertools import product, permutations
 
-@njit(float64(float64))
 def fact(number):
     number = int(number)
     if number < 0:
@@ -1571,16 +1569,14 @@ def fact(number):
         #print('fact', factorial)
         return factorial
 
-@njit(complex128[:, :](complex128[:, :]))
 def from_matrix_to_result_copy(matrix):
     w, v = np.linalg.eig(matrix)
-    result = np.zeros((matrix.shape[0] + 1, matrix.shape[0]), dtype=complex128)
+    result = np.zeros((matrix.shape[0] + 1, matrix.shape[0]), dtype="complex128")
     result[0, :] = w
     result[1:, :] = v
     result = result[:, result[0, :].real.argsort()]
     return result
 
-@jit(float64(float64[:,:]))
 def sixj_symbol(matrix):
     # computes racah formula for 6j-symbols (p 57 Ch 1 libro Boca)
     # {[a, b, c],[A, B, C]} or {[j1, j2, j3],[j4, j5, j6]}
@@ -1629,7 +1625,6 @@ def sixj_symbol(matrix):
 
     return result
 
-@jit(float64(float64[:,:]))
 def threej_symbol(matrix):
     # computes racah formula for 3j-symbols (p 52 Ch 1 libro Boca)
     # ([a , b, c],[A, B, C]) or ([j1, j2, j3],[m1, m2, m3])
@@ -1690,7 +1685,6 @@ def threej_symbol(matrix):
 
     return result
 
-@jit(numba.types.UniTuple(complex128[:], 3)(float64,float64,float64,float64,float64,float64,float64,float64,float64[:]))   #capire bene come restituire le tuple
 def Zeeman(L,S,J,M,L1,S1,J1,M1,field=np.array([0.,0.,0.])):
     # eq from Boca 2012 p 588
 
@@ -1712,8 +1706,8 @@ def Zeeman(L,S,J,M,L1,S1,J1,M1,field=np.array([0.,0.,0.])):
 
     rme = pre*(L1q + S1q)
 
-    int_L1 = np.zeros(3, dtype=complex128)
-    int_S1 = np.zeros(3, dtype=complex128)
+    int_L1 = np.zeros(3, dtype="complex128")
+    int_S1 = np.zeros(3, dtype="complex128")
 
     integral = 0 + 0 * 1j
     for i, q in enumerate(range(-1, 2, 1)):
@@ -1725,17 +1719,16 @@ def Zeeman(L,S,J,M,L1,S1,J1,M1,field=np.array([0.,0.,0.])):
         integral_Im = (-1) ** q * preq * rme * Bohr * Bq[i].imag
         integral += integral_Re +1j*integral_Im
 
-    fake_array = np.zeros(3, dtype=complex128)  #this is just because I need to return things of the same type
+    fake_array = np.zeros(3, dtype="complex128")  #this is just because I need to return things of the same type
     fake_array[0] = integral
 
     return (fake_array, int_L1, int_S1)
 
-@jit(complex128[:,:,:](float64[:,:]))
 def mag_moment(basis):
     #costruction of magnetic moment matrix as -kL-geS
     #y component is divided by i (imaginary unit)
 
-    matrix = np.zeros((3, basis.shape[0],basis.shape[0]),dtype=complex128)
+    matrix = np.zeros((3, basis.shape[0],basis.shape[0]),dtype="complex128")
     # L_matrix = np.zeros_like(matrix)
     for i in range(basis.shape[0]):
         statei = basis[i]
@@ -1774,11 +1767,10 @@ def mag_moment(basis):
     
     return matrix
 
-@jit
 def norm(tensor):
     return np.sqrt(np.sum(np.abs(tensor)**2))
 
-@jit
+
 def dfridr(func, x, h, idxi, shape, fargs):
 
     # print(idxi)
@@ -1831,12 +1823,11 @@ def dfridr(func, x, h, idxi, shape, fargs):
 
     return risultato, err
 
-@jit(complex128[:,:](float64[:],float64[:,:],complex128[:,:]))
 def add_Zeeman(field_vec, basis, LF_matrix):
 
     #print('add_Zeeman')
 
-    matrix = np.zeros((basis.shape[0],basis.shape[0]),dtype=complex128)
+    matrix = np.zeros((basis.shape[0],basis.shape[0]),dtype="complex128")
     for i in range(basis.shape[0]):
         statei = basis[i]
         Si = statei[0]/2.
@@ -1867,18 +1858,17 @@ def add_Zeeman(field_vec, basis, LF_matrix):
 
     return matrix
 
-@jit(float64[:](float64[:],complex128[:,:,:],complex128[:,:],float64[:,:],float64))
 def M_vector(field_vec, mu_matrix, LF_matrix, basis, temp):
 
     kB = 1.380649e-23
 
-    mu = np.zeros((basis.shape[0], 3), dtype=complex128)
+    mu = np.zeros((basis.shape[0], 3), dtype="complex128")
     matrix = add_Zeeman(field_vec, basis, LF_matrix)
     result = from_matrix_to_result_copy(matrix)
     E = (result[0,:].real-min(result[0,:].real)) #* 1.9865e-23
     E -= min(E)
 
-    M = np.zeros(3, dtype=float64)
+    M = np.zeros(3, dtype="float64")
 
     for kk in range(3):
         CI=1
@@ -1900,7 +1890,6 @@ def M_vector(field_vec, mu_matrix, LF_matrix, basis, temp):
 
     return M
 
-@jit('Tuple((float64[:,:],float64[:,:]))(float64[:,:],float64,float64[:,:],complex128[:,:],float64)')
 def susceptibility_B_ord1(fields, temp, basis, LF_matrix, delta=0.001):
     # returns the derivative of the function at a point x by Ridders' method of polynomial extrapolation. The value h is input as an estimated initial stepsize.
     # it need not to be small, but rather should be an increment in x over which the function changes substantially. An estimate of the error is also computed.
@@ -1912,7 +1901,7 @@ def susceptibility_B_ord1(fields, temp, basis, LF_matrix, delta=0.001):
     #print('ord1')
     mu_matrix = mag_moment(basis)  #complex128[:,:,:]
     # print('from ord1: ', mu_matrix)
-    chi = np.zeros((fields.shape[0], 3, 3), dtype=float64)
+    chi = np.zeros((fields.shape[0], 3, 3), dtype="float64")
     err = np.zeros_like(chi)
     for i in range(fields.shape[0]):
         for idx in range(3):
@@ -1925,6 +1914,7 @@ def susceptibility_B_ord1(fields, temp, basis, LF_matrix, delta=0.001):
     err_tensor = np.sum(err, axis=0)/fields.shape[0]
 
     return (chi_tensor, err_tensor)
+
 
 #======================= MAGNETIC PROPERTIES ==============================
 
@@ -1945,7 +1935,7 @@ class Magnetics():
 
         #print('\nMAGNETIC PROPERTIES CALCULATION\n')
 
-    def mag_moment(self, k, evaluation=True):
+    def mag_moment(self, k=1, evaluation=True):
         #costruction of magnetic moment matrix as kL+geS
         #y component is divided by i (imaginary unit)
 
