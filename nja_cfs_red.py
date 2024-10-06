@@ -12,6 +12,8 @@ from itertools import islice
 from datetime import datetime
 from pprint import pprint
 
+__version__ = "0.2.0"
+
 def cron(func, *args, **kwargs):
     """
     Decorator function to monitor the runtime of a function.
@@ -1945,7 +1947,7 @@ class Magnetics():
 
         #print('\nMAGNETIC PROPERTIES CALCULATION\n')
 
-    def mag_moment(self, k, evaluation=True):
+    def mag_moment(self, k=1, evaluation=True):
         #costruction of magnetic moment matrix as kL+geS
         #y component is divided by i (imaginary unit)
 
