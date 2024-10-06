@@ -7,7 +7,6 @@
 import nja_cfs_v0 as nja
 import functools
 from datetime import datetime
-import on_dev as dev
 import numpy as np
 import scipy
 
@@ -162,7 +161,7 @@ def test_plot_Ediagram():
     calc = nja.calculation(conf, TAB=True, wordy=True)
     basis, dic_LS, basis_l, basis_l_JM = nja.Full_basis(conf)
 
-    dic_orca = dev.read_AILFT_orca6('test/calcsuscenisalfix.out', conf, method='CASSCF', return_V=False, rotangle_V=False, print_orcamatrix=False)
+    dic_orca = nja.read_AILFT_orca6('test/calcsuscenisalfix.out', conf, method='CASSCF', return_V=False, rotangle_V=False, print_orcamatrix=False)
 
     contributes = ['Hee', 'Hcf', 'Hso']
     theories = ['Hee', 'Hee + Hcf', 'Hee + Hcf + Hso']
@@ -327,9 +326,9 @@ def test_LF_rotation_euler():
     dic_Bkq_rot1['0']['0'] = 0
 
     #converto i Bkq in V, ruoto V e poi ricalcolo i Bkq
-    dic_V = dev.from_Vint_to_Bkq_2(3, dic_Bkq, reverse=True)
-    dic_V = dev.rotate_dicV(dic_V, 3, rotangle_V=R, real=True)
-    dic_Bkq_rot2 = dev.from_Vint_to_Bkq_2(3, dic_V, reverse=False)
+    dic_V = nja.from_Vint_to_Bkq_2(3, dic_Bkq, reverse=True)
+    dic_V = nja.rotate_dicV(dic_V, 3, rotangle_V=R, real=True)
+    dic_Bkq_rot2 = nja.from_Vint_to_Bkq_2(3, dic_V, reverse=False)
 
     for k in dic_Bkq_rot1.keys():
         for q in dic_Bkq_rot1[k]:
@@ -369,9 +368,9 @@ def test_LF_rotation_quat():
     dic_Bkq_rot1['0']['0'] = 0
 
     #converto i Bkq in V, ruoto V e poi ricalcolo i Bkq
-    dic_V = dev.from_Vint_to_Bkq_2(3, dic_Bkq, reverse=True)
-    dic_V = dev.rotate_dicV(dic_V, 3, rotangle_V=quat, real=True)
-    dic_Bkq_rot2 = dev.from_Vint_to_Bkq_2(3, dic_V, reverse=False)
+    dic_V = nja.from_Vint_to_Bkq_2(3, dic_Bkq, reverse=True)
+    dic_V = nja.rotate_dicV(dic_V, 3, rotangle_V=quat, real=True)
+    dic_Bkq_rot2 = nja.from_Vint_to_Bkq_2(3, dic_V, reverse=False)
 
     for k in dic_Bkq_rot1.keys():
         for q in dic_Bkq_rot1[k]:
@@ -410,7 +409,7 @@ def test_M_vector():
     #conv for orca: 27.2113834*8065.54477 from a.u. to cm-1
     from_au = 27.2113834*8065.54477
 
-    dic = dev.read_AILFT_orca6('test/CrF63-.out', conf)
+    dic = nja.read_AILFT_orca6('test/CrF63-.out', conf)
 
     calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
     result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
@@ -687,7 +686,7 @@ def test_reduction():
     ground = nja.ground_term_legend(conf)
     from_au = 27.2113834*8065.54477
 
-    dic = dev.read_AILFT_orca6('test/run_DOTA1_21sextets.out', conf)
+    dic = nja.read_AILFT_orca6('test/run_DOTA1_21sextets.out', conf)
     dic_Bkq = dic['dic_bkq'].copy()
     dic_Bkq['0'] = {}
     dic_Bkq['0']['0'] = 0
