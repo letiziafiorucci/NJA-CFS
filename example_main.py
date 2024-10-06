@@ -113,6 +113,55 @@ if 0:
     #plot energy levels
     nja.level_fig_tot(E_matrix, theories, proj_LS_dict, proj_prev_dict)
 
+#Reduced basis
+if 1:
+
+    conf = 'f9'
+    contributes = ['Hee','Hso','Hcf']
+    dic = nja.read_AILFT_orca6('test/run_DOTA1_21sextets.out', conf)
+    dic_Bkq = dic['dic_bkq'].copy()
+    dic_Bkq['0'] = {}
+    dic_Bkq['0']['0'] = 0
+
+    calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=True)
+    calc.reduce_basis(conf, roots = [(21,6)], wordy=True)  #questo va cambiato.. perché probabilmente mi serve di utilizzare la J
+    basis = calc.basis.copy()
+    basis_l = calc.basis_l.copy()
+
+    B0 = [0.0,0.0,28.0]
+    contributes = ['Hee', 'Hso', 'Hcf', 'Hz']
+    theories = ['Hee', 'Hee + Hso', 'Hee + Hso + Hcf', 'Hee + Hso + Hcf + Hz']
+
+    list_contr = []
+    E_matrix = []
+    proj_LS_dict = {}
+    proj_prev_dict = {}
+    prev = np.zeros((basis.shape[0]+1,basis.shape[0]), dtype='complex128')
+    for i in range(len(contributes)):
+        list_contr.append(contributes[i])
+        result = calc.MatrixH(list_contr, **dic, field=B0, wordy=True, ground_proj=False, return_proj=False)
+        if i==0:
+            E0 = np.min(result[0,:].real)
+        result[0,:] = result[0,:].real-E0
+
+        proj_LS = nja.projection_basis(result[1:,:], basis_l, J_label=False)
+
+        proj_LS_dict[theories[i]] = proj_LS
+        if i==0:
+            pass
+        else:
+            proj_prev = nja.projection(result[1:,:], basis_l, prev[1:,:], prev[0,:].real)
+            proj_prev_dict[theories[i]] = proj_prev
+
+        E_matrix.append([round(result[0,ii].real,3) for ii in range(result.shape[-1])])  #tengo fino alla terza decimale
+
+        prev = result.copy()
+
+    E_matrix = np.array(E_matrix)  # dim = (n. contributi x n. livelli)
+
+    #plot energy levels
+    nja.level_fig_tot(E_matrix, theories, proj_LS_dict, proj_prev_dict)
+
 # Complete (takes 45 minutes in total with f9)
 if 0:
     
