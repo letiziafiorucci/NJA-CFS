@@ -608,6 +608,62 @@ def test_susceptibility_B_ord1_2():
 
     assert np.array_equal(np.round(chi_B_diff, 37),np.round(chi_B[0], 37))
 
+@test
+def test_susceptibility_B_ord1_3():
+
+    conf = 'f9'
+    contributes = ['Hcf']
+    
+    #comparison with the results from: J. Am. Chem. Soc. 2021, 143, 8108−8115
+    cfp_list = np.loadtxt('test/CFP_DyDOTA.txt')
+    dic_Aqkrk = {}
+    count = 0
+    for k in range(2,7,2):
+        dic_Aqkrk[f'{k}'] = {}
+        for q in range(k,-k-1,-1):
+            dic_Aqkrk[f'{k}'][f'{q}'] = cfp_list[count]/nja.Stev_coeff(str(k), conf)
+            count += 1
+
+    dic_Bkq = nja.from_Aqkrk_to_Bkq(dic_Aqkrk)
+    dic = {}
+    dic['dic_bkq'] = dic_Bkq
+    dic_Bkq['0'] = {}
+    dic_Bkq['0']['0'] = 0
+
+    # #g ref syst for Dy from J. Am. Chem. Soc. 2021, 143, 8108−8115
+    Rot_mat = np.array([[0.696343, 0.027550, -0.717180],[0.216884, 0.944468, 0.246864],[0.684155, -0.327447, 0.651698]])  
+ 
+    R = scipy.spatial.transform.Rotation.from_matrix(Rot_mat.T).as_quat()
+    quat = [R[-1], R[0], R[1], R[2]]
+    dict, coeff = nja.read_DWigner_quat()
+    dic_Bkq = nja.rota_LF_quat(3, dic_Bkq, quat, dict=dict, coeff=coeff)
+    dic['dic_bkq'] = dic_Bkq
+    dic_Bkq['0'] = {}
+    dic_Bkq['0']['0'] = 0
+
+    calc = nja.calculation(conf, ground_only=True, TAB=True, wordy=False)
+    _, _ = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    basis = np.loadtxt('matrix_label.txt')
+    LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
+    
+    chi_B_diff, err_B = nja.susceptibility_B_ord1(np.array([[0.0,0.0,0.0]]), 298., basis, LF_matrix, delta=1)
+
+    w,v = np.linalg.eig(chi_B_diff)
+    w,v = nja.princ_comp(w,v)
+
+    dic['field'] = np.array([0.0,0.0,1e-7*2.35051756758e5])
+    Magn = nja.Magnetics(calc, ['Hcf','Hz'], dic)
+    gw, gv = Magn.effGval((1,2))
+    gw, gv = nja.princ_comp(gw, gv)
+
+    gw_paper = np.array([0.255, 0.668, 19.238])
+
+    for i in range(3):
+        assert gw[i]/gw_paper[i] > 0.95 and gw[i]/gw_paper[i] < 1.05
+
+    assert chi_B_diff[0,0] > 1e-33
+    assert err_B[0,0] < chi_B_diff[0,0]*1e-3
+
 # in weak-field / high-temperature limit, finite-field magnetization should be linear in external field
 @test
 def test_calc_susceptibility_zerofield():
@@ -671,33 +727,18 @@ def test_calc_susceptibility_zerofield():
 
 def test_reduction():
 
-    from pprint import pprint
-
-    label, coord = nja.read_structure('../DOTA1_0.xyz')
-    coord_H = []
-    for i in range(len(label)):
-        if 'H' in label[i]:
-            coord_H.append(coord[i,:])
-    
-    R_coord = np.array(coord_H)
-
     conf = 'f9'
-    contributes = ['Hee','Hso']
-    ground = nja.ground_term_legend(conf)
-    from_au = 27.2113834*8065.54477
-
+    contributes = ['Hee','Hso','Hcf']
     dic = nja.read_AILFT_orca6('test/run_DOTA1_21sextets.out', conf)
     dic_Bkq = dic['dic_bkq'].copy()
     dic_Bkq['0'] = {}
     dic_Bkq['0']['0'] = 0
-    pprint(dic_Bkq)
-    exit()
 
-    calc = calculation(conf, ground_only=True, TAB=True, wordy=True)
-    # calc.reduce_basis(conf, roots = [(21,6)], wordy=True)  #questo va cambiato.. perché probabilmente mi serve di utilizzare la J
+    calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=True)
+    calc.reduce_basis(conf, roots = [(21,6)], wordy=True)  #questo va cambiato.. perché probabilmente mi serve di utilizzare la J
     result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=True, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
-    print(projected[1])
 
+    
 
 if __name__ == '__main__':
 
@@ -705,32 +746,31 @@ if __name__ == '__main__':
     #one test on ground state composition and energy levels values from f_electron
     #one test on energy levels values from ORCA (on CoTp2)
     #one test on energy levels values from ORCA with basis reduction (on DyDOTA)
-    #test on figure for energy levels splitting
-    #check magnetization is zero in absence of field 
+    #check energy for all configurations
 
     #### test figures
     # test_plot_Ediagram()
 
     #### all passed
-    test_conv_AqkrkBkq() #f11
-    test_PCM() #f9
-    test_StevensfromMOLCAS #f9
-    test_Wigner_Euler_quat()
-    test_Wigner_Euler_quat2()
-    test_LF_rotation_euler()
-    test_LF_rotation_quat()
-    test_mag_moment()  #d1
-    test_mag_moment2()  #f9
-    test_M_vector()  #d3
-    test_M_vector2()  #d9
-    test_gtensor() #f13
-    test_susceptibility_B_ord1()  #d8
-    test_susceptibility_B_ord1_2()  #d8
-    test_calc_susceptibility_zerofield()  #d8
+    # test_conv_AqkrkBkq() #f11
+    # test_PCM() #f9
+    # test_StevensfromMOLCAS #f9
+    # test_Wigner_Euler_quat()
+    # test_Wigner_Euler_quat2()
+    # test_LF_rotation_euler()
+    # test_LF_rotation_quat()
+    # test_mag_moment()  #d1
+    # test_mag_moment2()  #f9
+    # test_M_vector()  #d3
+    # test_M_vector2()  #d9
+    # test_gtensor()  #f13
+    # test_susceptibility_B_ord1()  #d8
+    # test_susceptibility_B_ord1_2()  #d8
+    # test_susceptibility_B_ord1_3()  #f9
+    # test_calc_susceptibility_zerofield()  #d8
 
     #### on development
-    # test_susceptibility_B_ord1_2_copy()
-    # test_reduction()
+    test_reduction()
     
 
     

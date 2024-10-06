@@ -1247,7 +1247,7 @@ class calculation():  #classe principale
 
         print('Performing basis reduction... \n' if wordy else "", end = "")
 
-        def state_select(ground, basis):
+        def state_select(ground, basis, basis_l, basis_l_JM):
 
             term_num = [(int(ground[0])-1), state_legend(ground[1]), eval(ground[ground.index('(')+1:ground.index(')')])*2]
             basis_new = []
@@ -1256,21 +1256,26 @@ class calculation():  #classe principale
             dic_LS_red = {}
             for ii in range(basis.shape[0]):
                 if np.equal(basis[ii,:3],term_num).all():
+                    # print(basis[ii,:], term_num, basis_l[ii], basis_l_JM[ii])
                     if list(basis[ii]) not in basis_new:
                         basis_new.append(list(basis[ii]))
                         lista = list(basis[ii])
                         dic_LS_red[':'.join(f'{n}' for n in lista)]=self.dic_LS[':'.join(f'{n}' for n in lista)]
-                        basis_l_red.append(self.basis_l[ii])
-                        basis_l_JM_red.append(self.basis_l_JM[ii])
+                        basis_l_red.append(basis_l[ii])
+                        basis_l_JM_red.append(basis_l_JM[ii])
             basis_new = np.array(basis_new)
             
             basis_update = []
+            basis_l_update = []
+            basis_l_JM_update = []
             for ii in range(basis.shape[0]):
                 if not any((basis[ii] == x).all() for x in basis_new):
                     basis_update.append(list(basis[ii]))
+                    basis_l_update.append(basis_l[ii])
+                    basis_l_JM_update.append(basis_l_JM[ii])
             basis_update = np.array(basis_update)
 
-            return basis_update, basis_new, dic_LS_red, basis_l_red, basis_l_JM_red
+            return basis_update, basis_l_update, basis_l_JM_update, basis_new, dic_LS_red, basis_l_red, basis_l_JM_red
 
         def gram_schmidt(vectors):
             n = vectors.shape[1]  # Number of vectors
@@ -1311,7 +1316,7 @@ class calculation():  #classe principale
             if dic is None:
                 dic = free_ion_param_f_HF(conf)
             if contributes is None:
-                matrix = self.build_matrix(['Hee', 'Hso'], **dic)
+                matrix = self.build_matrix(['Hee'], **dic)
             else:
                 matrix = self.build_matrix(contributes, **dic)
 
@@ -1337,15 +1342,19 @@ class calculation():  #classe principale
                     unique_max_proj.append(item)
             max_proj = unique_max_proj
 
-        #print(max_proj)
+        # print(max_proj)
 
         basis_update = np.copy(self.basis)
+        basis_l_update = np.copy(self.basis_l)
+        basis_l_JM_update = np.copy(self.basis_l_JM)
         nroots = np.zeros(len(roots))
         for i in range(len(roots)):
             for j in range(len(max_proj)):
                 if nroots[i] < roots[i][0]*roots[i][1] and int(max_proj[j][0])==roots[i][1]:
+                    # print(nroots[i], roots[i][0]*roots[i][1], int(max_proj[j][0]), roots[i][1], max_proj[j])
                     nroots[i] += (eval(max_proj[j][max_proj[j].index('(')+1:max_proj[j].index(')')]))*2 +1 #eval(max_proj[j][0])*(2*state_legend(max_proj[j][1])+1) #
-                    basis_update, basis_proj, dic_LS_proj, basis_l_proj, basis_l_JM_proj = state_select(max_proj[j], basis_update)
+                    basis_update, basis_l_update, basis_l_JM_update, basis_proj, dic_LS_proj, basis_l_proj, basis_l_JM_proj = state_select(max_proj[j], basis_update, basis_l_update, basis_l_JM_update)
+                    # print(basis_l_proj)
                     if basis_update.size > 0:
                         if i==0 and 'basis_red' not in locals():
                             basis_red = np.copy(basis_proj)
@@ -1357,13 +1366,12 @@ class calculation():  #classe principale
                             dic_LS_red.update(dic_LS_proj)
                             basis_l_red += basis_l_proj
                             basis_l_JM_red += basis_l_JM_proj
-        #print(nroots)
 
         self.basis, self.dic_LS, self.basis_l, self.basis_l_JM = basis_red, dic_LS_red, basis_l_red, basis_l_JM_red
 
         print('Calculation on reduced set\nBasis set reduced to: '+str(self.basis.shape[0])+'\n' if wordy else "", end = "")
 
-        
+
     #@njit
     #@cron
     def MatrixH(self, elem, F0=0, F2=0, F4=0, F6=0, zeta=0, k=1, dic_V=None, dic_bkq = None,dic_AOM = None, PCM = None, field = [0.,0.,0.], cfp_angles = None, evaluation=True,wordy=False,
