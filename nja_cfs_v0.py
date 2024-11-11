@@ -11,8 +11,10 @@ from itertools import islice
 from datetime import datetime
 from pprint import pprint
 import copy
+import warnings
+import re
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 
 def print_program_info():
     program_name = "NJA-CFS (Not Just Another - Crystal Field Software)"
@@ -597,11 +599,14 @@ class RME():  #RME(CFP)
             pass
 
 
-    def Uk(self, k):#, n=None, v=None, L=None, S=None, v1=None, L1=None, S1=None, label1=None, label2=None, closed=True):   #perché qui ho dovuto ripassare tutto?
+    def Uk(self, k, n=None, v=None, L=None, S=None, v1=None, L1=None, S1=None, label1=None, label2=None):   
         """
         Calculate the Uk coefficient for a given set of quantum numbers and labels.
 
-        This method calculates the Uk coefficient, which is used in the calculation of reduced matrix elements (RMEs) in atomic physics. The quantum numbers and labels for the initial and final states are either provided as arguments or taken from the RME object itself. The calculation involves summing over the coefficients of fractional parentage (CFP) for the initial and final states and the 6-j symbol of the associated angular momenta.
+        This method calculates the Uk coefficient, which is used in the calculation of reduced matrix elements (RMEs) in atomic physics. 
+        The quantum numbers and labels for the initial and final states are either provided as arguments or taken from the RME object itself. 
+        The calculation involves summing over the coefficients of fractional parentage (CFP) for the initial and final states 
+        and the 6-j symbol of the associated angular momenta.
 
         Parameters:
         k (int): The rank of the tensor operator.
@@ -610,8 +615,12 @@ class RME():  #RME(CFP)
         Uk (float): The calculated Uk coefficient.
         """
 
-        # if n is None:
-        n, v, L, S, v1, L1, S1, label1, label2 = self.N, self.v, self.L, self.S, self.v1, self.L1, self.S1, self.label1, self.label2
+        if n is None:
+            n = self.N
+        if v is None or L is None or S is None or label1 is None:
+            v, L, S, label1 = self.v, self.L, self.S, self.label1
+        if v1 is None or L1 is None or S1 is None or label2 is None:
+            v1, L1, S1, label2 = self.v1, self.L1, self.S1, self.label2
 
         pref = n*(2*L+1)**0.5*(2*L1+1)**0.5
 
@@ -670,6 +679,7 @@ class RME():  #RME(CFP)
             return (-1)**k*pref*somma
         else:
             return pref*somma
+
 
 class Hamiltonian():
 
@@ -733,7 +743,6 @@ class Hamiltonian():
             self.TAB = True
             self.rme = tables
 
-
     def electrostatic_int(self, basis, F0=0, F2=0, F4=0, F6=0, eval_bool=True, tab_ee=None):
         #equations are taken from Boca 1999, "theoretical fundations of molecular magnetism" (Ch 8, p 518) (valid only for l2 conf)
         #for the other configurations the equations are reported in Boca 2012 (p 145 eq 4.66-4.69)
@@ -752,7 +761,7 @@ class Hamiltonian():
             Sv1, Lv1, vv1 = term_basis[idxv1]
             Sv1 /= 2
             #print(label1v1, Sv1, Lv1, vv1)
-            integral = 0
+
             ck_list = np.zeros(len(range(0,2*self.l+1,2)))
             for i,k in enumerate(range(0,2*self.l+1,2)):
                 ck = 0
@@ -769,7 +778,6 @@ class Hamiltonian():
                             if label2[0]==label1v[0]:
                                 #print(label2, label1v, label1v1)
                                 somma += self.rme.Uk(k, n=self.N, v=vv, L=Lv, S=Sv, v1=v1, L1=L1, S1=S1, label1=label1v, label2=label2)*self.rme.Uk(k, n=self.N, v=vv1, L=Lv1, S=Sv1, v1=v1, L1=L1, S1=S1, label1=label1v1, label2=label2)  #questi non sono quelli di closed shell
-                                #print(self.rme.Uk(k, n=self.N, v=vv, L=Lv, S=Sv, v1=v1, L1=L1, S1=S1, label1=label1v, label2=label2)*self.rme.Uk(k, n=self.N, v=vv1, L=Lv1, S=Sv1, v1=v1, L1=L1, S1=S1, label1=label1v1, label2=label2))
                         else:
 
                             label2 = term_label[ii]
@@ -895,6 +903,465 @@ class Hamiltonian():
         # print(ck_coeff*basis.shape[0])
         # exit()
 
+        # print(self.v, self.v1)
+        # print(integral, ck, coeff)
+        # exit()
+
+        return integral
+    
+    def electrostatic_int_test(self, basis, F0=0, F2=0, F4=0, F6=0, eval_bool=True, tab_ee=None):
+        #equations are taken from Boca 1999, "theoretical fundations of molecular magnetism" (Ch 8, p 518) (valid only for l2 conf)
+        #for the other configurations the equations are reported in Boca 2012 (p 145 eq 4.66-4.69)
+
+        def delta(a,b,c):
+            #is needed simply to compute the eigenvalues of a 2x2 matrix
+            return np.sqrt(4*c**2+(a-b)**2)
+        
+        def eig2x2(a,b,c):
+            l1 = (a+b-delta(a,b,c))/2
+            l2 = (a+b+delta(a,b,c))/2
+            return l1,l2
+
+        def omegaUL(U,L):
+            gU = {99:0,
+                10:6,
+                11:12,
+                20:14,
+                21:21,
+                30:24,
+                22:30,
+                31:32,
+                40:36}
+            return 1/2*state_legend(L)*(state_legend(L)+1) - gU[U]
+
+        S_list = [7/2, 3, 5/2, 5/2, 2, 2, 3/2, 3/2, 1, 1/2]
+        v_list = [7, 6, 5, 7, 4, 6, 5, 7, 6, 7]
+
+        #W, U, U1
+        x_g = {220:
+                {20:
+                {20:3/14, 21:3*np.sqrt(55)/7, 22:-3*np.sqrt(5/28)},
+                21:
+                {20:3*np.sqrt(55)/7, 21:[-6/7,-3], 22:3/np.sqrt(7)}},
+                22:
+                {20:-3*np.sqrt(5/28), 21:3/np.sqrt(7), 22:3/2},
+               221:
+                {10:
+                {30:5*np.sqrt(143), 31:-15*np.sqrt(429)},
+                11:
+                {21:14*np.sqrt(910/11), 30:2*np.sqrt(10), 31:2*np.sqrt(39)/11},
+                20:
+                {20:2/7, 21:-10*np.sqrt(6)/7, 30:np.sqrt(3), 31:9*np.sqrt(3/7)},
+                21:
+                {11:14*np.sqrt(910/11), 20:-10*np.sqrt(6)/7, 21:[-1/7,12/11], 30: 5*np.sqrt(2/11), 31:3*np.sqrt(2)/11},
+                30:
+                {10: 5*np.sqrt(143), 11:2*np.sqrt(10), 20: np.sqrt(3), 21:5*np.sqrt(2/11), 30:-1/2, 31:3/(2*np.sqrt(11))},
+                31:
+                {10:-15*np.sqrt(429), 11:2*np.sqrt(39)/11, 20:9*np.sqrt(3/7), 21:3*np.sqrt(2)/11, 30:3/(2*np.sqrt(11)), 31:1/22}},
+               222:
+                {99:
+                {40:-30*np.sqrt(143)},
+                10:
+                {30:-3*np.sqrt(1430), 40:9*np.sqrt(1430)},
+                20:
+                {20:6/11, 30:-3*np.sqrt(42/11), 40:9*np.sqrt(2)/11},
+                30:
+                {10:-3*np.sqrt(1430), 20:-3*np.sqrt(42/11), 30:-3, 40:1/np.sqrt(11)},
+                40:
+                {99:-30*np.sqrt(143), 10:9*np.sqrt(1430), 20:9*np.sqrt(2)/11, 30:1/np.sqrt(11), 40:3/11}}}
+        #U' L U
+        chi_L = {20:
+                {"D":{20:143},
+                "G":{20:-130},
+                "I":{20:35}},
+                21:
+                {"H":{11:1, 20:0, 21:[49,-75]},
+                "D":{20:-39*np.sqrt(2), 21:[377, 13]},
+                "F":{21:[455, -65]},
+                "G":{20:4*np.sqrt(65), 21:[-561, 55]},
+                "K":{21:[-315, 133]},
+                "L":{21:[245, -75]}},
+                30:
+                {"P":{11:-13*np.sqrt(11), 30:-52},
+                "F":{10:1, 21:12*np.sqrt(195), 30:38},
+                "G":{20:-13*np.sqrt(5), 21:8*np.sqrt(143), 30:-52},
+                "H":{11:np.sqrt(39), 21:11*np.sqrt(42), 30:88},
+                "I":{20:30, 30:25},
+                "K":{21:-4*np.sqrt(17), 30:-94},
+                "M":{30:25}},
+                22:
+                {"S":{22:260},
+                "D":{20:3*np.sqrt(429), 21:45*np.sqrt(78), 22:-25},
+                "G":{20:-38*np.sqrt(65), 21:12*np.sqrt(11), 22:94},
+                "H":{21:-12*np.sqrt(546), 22:104},
+                "I":{20:21*np.sqrt(85), 22:-181},
+                "L":{21:-8*np.sqrt(665), 22:-36},
+                "N":{22:40}},
+                31:
+                {"P":{11:11*np.sqrt(330), 30:76*np.sqrt(143), 31:-6644},
+                "D":{20:-8*np.sqrt(78), 21:-60*np.sqrt(39/7), 31:4792},
+                "F":{10:[0,1], 21:[-312*np.sqrt(5), 12*np.sqrt(715)], 30:[-48*np.sqrt(39), -98*np.sqrt(33)], 31:list(eig2x2(4420, -902, 336*np.sqrt(143)))},
+                "G":{20:5*np.sqrt(65), 21:2024/np.sqrt(7), 30:20*np.sqrt(1001), 31:-2684},
+                "H":{11:[11*np.sqrt(85), -25*np.sqrt(77)], 21:[31*np.sqrt(1309/3), 103*np.sqrt(5/3)], 30:[-20*np.sqrt(374), -44*np.sqrt(70)], 31:list(eig2x2(-2024,2680,-48*np.sqrt(6545)))},
+                "I":{20:[10*np.sqrt(21),0], 30:[-57*np.sqrt(33), 18*np.sqrt(1122)], 31:list(eig2x2(-12661/5,17336/5,-3366*np.sqrt(34)/5))},
+                "K":{21:[-52*np.sqrt(323/23), -336*np.sqrt(66/23)], 30:[-494*np.sqrt(19/23), 73*np.sqrt(1122/23)], 31:list(eig2x2(123506/23, -85096/23, 144*np.sqrt(21318)/23))},
+                "L":{21:-24*np.sqrt(190), 31:-4712},
+                "M":{30:-21*np.sqrt(385), 31:-473},
+                "N":{31:1672},
+                "O":{31:220}},
+                40:
+                {"S":{99:1, 40:-1408},
+                "D":{20:-88*np.sqrt(13), 40:-44},
+                "F":{10:1, 30:90*np.sqrt(11), 40:1078},
+                "G":{20:[53*np.sqrt(715/27), 7*np.sqrt(15470/27)], 30:[-16*np.sqrt(1001), 64*np.sqrt(442)], 40:list(eig2x2(-16720/9, 10942/9, -34*np.sqrt(2618)/9))},
+                "H":{30:-72*np.sqrt(462), 40:-704},
+                "I":{20:[34*np.sqrt(1045/31), -12*np.sqrt(1785/31)], 30:[-9*np.sqrt(21945/31), 756*np.sqrt(85/31)], 40:list(eig2x2(-2453/31, 36088/31, 60*np.sqrt(74613)/31))},
+                "K":{30:-84*np.sqrt(33), 40:-132},
+                "L":{40:list(eig2x2(-4268/31, 11770/31, 924*np.sqrt(1995)/31))},
+                "M":{30:-99*np.sqrt(15), 40:-1067},
+                "N":{40:528},
+                "Q":{40:22}}}
+        #U' L U
+        phi_L = {11:
+                {"P":{11:-11},
+                "H":{11:3}},
+                20:
+                {"D":{20:-11},
+                "G":{20:-4},
+                "I":{20:7}},
+                21:
+                {"D":{20:6*np.sqrt(2), 21:-57},
+                "F":{10:1, 21:63},
+                "G":{20:np.sqrt(65), 21:55},
+                "H":{21:-105},
+                "K":{21:-14},
+                "L":{21:42}},
+                30:
+                {"P":{11:np.sqrt(11), 30:83},
+                "F":{21:np.sqrt(195), 30:-72},
+                "G":{20:2*np.sqrt(5), 21:-np.sqrt(143), 30:20},
+                "H":{11:np.sqrt(39), 21:-2*np.sqrt(42), 30:-15},
+                "I":{20:3, 30:42},
+                "K":{21:-4*np.sqrt(17), 30:-28},
+                "M":{30:6}},
+                22:
+                {"S":{99:1, 22:144},
+                "D":{20:3*np.sqrt(429), 22:69},
+                "G":{20:4*np.sqrt(65), 22:-148},
+                "H":{22:72},
+                "I":{20:3*np.sqrt(85), 22:39},
+                "L":{22:-96},
+                "N":{22:56}},
+                31:
+                {"P":{11:np.sqrt(330), 30:17*np.sqrt(143), 31:209},
+                "D":{21:12*np.sqrt(273), 31:-200},
+                "F":{10:[1,0], 21:[-36*np.sqrt(5), -3*np.sqrt(715)], 30:[-16*np.sqrt(39), 24*np.sqrt(33)], 31:list(eig2x2(624, -616, -80*np.sqrt(143)))},
+                "G":{21:11*np.sqrt(7), 30:4*np.sqrt(1001), 31:836},
+                "H":{11:[np.sqrt(85), np.sqrt(77)], 21:[-2*np.sqrt(1309/3), -74*np.sqrt(5/3)], 30:[np.sqrt(187/2), 31*np.sqrt(35/2)], 31:list(eig2x2(-1353/2, 703/2, -5*np.sqrt(6545)/2))},
+                "I":{30:[30*np.sqrt(33), 0], 31:list(eig2x2(-2662/5, -88/5, 528*np.sqrt(34)/5))},
+                "K":{21:[-28*np.sqrt(323/23), 42*np.sqrt(66/23)], 30:[4*np.sqrt(437),0], 31:list(eig2x2(6652/23, -5456/23, 96*np.sqrt(21318)/23))},
+                "L":{21:-6*np.sqrt(190), 31:-464},
+                "M":{30:-6*np.sqrt(385), 31:814},
+                "N":{31:-616},
+                "O":{31:352}},
+                40:
+                {"S":{22:2*np.sqrt(2145)},
+                "D":{20:11*np.sqrt(13), 21:-6*np.sqrt(26), 22:9*np.sqrt(33)},
+                "F":{21:3*np.sqrt(455)},
+                "G":{20:[-4*np.sqrt(715/27),np.sqrt(15470/27)], 21:[-131*np.sqrt(11/27), 17*np.sqrt(238/27)], 22:[-4*np.sqrt(11/27), -17*np.sqrt(238/27)]},
+                "H":{21:-12*np.sqrt(21), 22:3*np.sqrt(286)},
+                "I":{20:[7*np.sqrt(1045/31),3*np.sqrt(1785/31)], 22:[3*np.sqrt(3553/31),75*np.sqrt(21/31)]},
+                "K":{21:-2*np.sqrt(119)},
+                "L":{21:[22*np.sqrt(105/31), -84*np.sqrt(19/31)], 22:[4*np.sqrt(627/31), 12*np.sqrt(385/31)]},
+                "N":{22:-np.sqrt(2530)}}}
+        #conf v:(2*S+1):U v1:(2*S1+1):U1
+        y_g = {"f3":
+                {"1:2:10":{"3:2:21":-6*np.sqrt(22)},
+                "3:2:11":{"3:2:11":2},
+                "3:2:20":{"3:2:20":10/7, "3:2:21":2*np.sqrt(66)/7},
+                "3:2:21":{"3:2:20":2*np.sqrt(66)/7, "3:2:21":2/7}},
+                "f4":
+                {"2:3:10":{"4:3:21":-12*np.sqrt(33/5)},
+                "2:3:11":{"4:3:11":6/5, "4:3:30":6},
+                "4:3:10":{"4:3:21":8*np.sqrt(11/15)},
+                "4:3:11":{"4:3:11":29/15,"4:3:30":-1/3},
+                "4:3:20":{"4:3:20":6/7, "4:3:21":-8*np.sqrt(11/147), "4:3:30":4/np.sqrt(3)},
+                "4:3:21":{"4:3:10":8*np.sqrt(11/15), "4:3:20":-8*np.sqrt(11/147), "4:3:21":-2/21, "4:3:30":-4/3},
+                "4:3:30":{"4:3:11":-1/3, "4:3:20":4/np.sqrt(3), "4:3:21":-4/3, "4:3:30":1/3},
+                "0:1:99":{"4:1:22":-12*np.sqrt(22)},
+                "2:1:20":{"4:1:20":3*np.sqrt(3/175), "4:1:21":-4*np.sqrt(33/35), "4:1:22":-np.sqrt(3/5)},
+                "4:1:20":{"4:1:20":221/140, "4:1:21":8*np.sqrt(11/245), "4:1:22":-np.sqrt(7/80)},
+                "4:1:21":{"4:1:20":8*np.sqrt(11/245), "4:1:21":2/7},
+                "4:1:22":{"4:1:20":-np.sqrt(7/80), "4:1:22":1/4}},
+                "f5":
+                {"3:4:10":{"5:4:21":9*np.sqrt(11)},
+                "3:4:20":{"5:4:20":3/np.sqrt(7), "5:4:21":np.sqrt(33/7), "5:4:30":-2*np.sqrt(21)},
+                "5:4:10":{"5:4:21":-np.sqrt(55/3)},
+                "5:4:11":{"5:4:11":-1/3, "5:4:30":-5/3},
+                "5:4:20":{"5:4:20":5/7, "5:4:21":5*np.sqrt(11/147), "5:4:30":2/np.sqrt(3)},
+                "5:4:21":{"5:4:10":-np.sqrt(55/3), "5:4:20":5*np.sqrt(11/147), "5:4:21":-4/21, "5:4:30":-2/3},
+                "5:4:30":{"5:4:11":-5/3, "5:4:20":2/np.sqrt(3), "5:4:21":-2/3, "5:4:30":-1/3},
+                "1:2:10":{"5:2:21":36/np.sqrt(5), "5:2:31":-36*np.sqrt(2)},
+                "3:2:11":{"5:2:11":3/np.sqrt(2), "5:2:30":3*np.sqrt(5)/2, "5:2:31":-np.sqrt(39/8)},
+                "3:2:20":{"5:2:20":3/7, "5:2:21":-11*np.sqrt(6)/7, "5:2:30":-4*np.sqrt(3)},
+                "3:2:21":{"5:2:10":3*np.sqrt(33/10), "5:2:20":-3*np.sqrt(33/98), "5:2:21":3/(7*np.sqrt(11)), "5:2:30":-3/(2*np.sqrt(2)), "5:2:31":3/(2*np.sqrt(22))},
+                "5:2:10":{"5:2:21":43/np.sqrt(30), "5:2:31":4*np.sqrt(3)},
+                "5:2:11":{"5:2:11":-5/6, "5:2:30":-5*np.sqrt(5/72), "5:2:31":-np.sqrt(13/48)},
+                "5:2:20":{"5:2:20":11/7, "5:2:21":-11/(7*np.sqrt(6)), "5:2:30":4/np.sqrt(3)},
+                "5:2:21":{"5:2:10":43/np.sqrt(30), "5:2:20":-11/(7*np.sqrt(6)), "5:2:21":25/231, "5:2:30":29/(6*np.sqrt(22)), "5:2:31":1/(22*np.sqrt(2))},
+                "5:2:30":{"5:2:11":-5*np.sqrt(5/72), "5:2:20":4/np.sqrt(3), "5:2:21":29/(6*np.sqrt(22)), "5:2:30":-1/12, "5:2:31":1/(4*np.sqrt(11))},
+                "5:2:31":{"5:2:10":4*np.sqrt(3), "5:2:11":-np.sqrt(13/48), "5:2:21":1/(22*np.sqrt(2)), "5:2:30":1/(4*np.sqrt(11)), "5:2:31":1/44}},
+                "f6":
+                {"4:5:10":{"6:5:21":-6*np.sqrt(11)},
+                "4:5:20":{"6:5:20":-2*np.sqrt(2/7), "6:5:21":2*np.sqrt(33/7)},
+                "2:3:10":{"6:3:21":-48*np.sqrt(2/5), "6:3:31":-36},
+                "2:3:11":{"6:3:11":np.sqrt(6/5), "6:3:30":np.sqrt(3), "6:3:31":3*np.sqrt(13/10)},
+                "4:3:10":{"6:3:21":46/np.sqrt(15), "6:3:31":-8*np.sqrt(6)},
+                "4:3:11":{"6:3:11":11/(3*np.sqrt(5)), "6:3:30":-19/(3*np.sqrt(2)), "6:3:31":np.sqrt(13/60)},
+                "4:3:20":{"6:3:20":-6*np.sqrt(2)/7, "6:3:21":-22/(7*np.sqrt(3)), "6:3:30":8*np.sqrt(2/3)},
+                "4:3:21":{"6:3:10":-np.sqrt(110/3), "6:3:20":np.sqrt(22/147), "6:3:21":-16/(21*np.sqrt(11)), "6:3:30":5/(3*np.sqrt(2)), "6:3:31":1/np.sqrt(22)},
+                "4:3:30":{"6:3:11":-np.sqrt(5)/3, "6:3:20":4*np.sqrt(2/3), "6:3:21":4/(3*np.sqrt(11)), "6:3:30":1/(3*np.sqrt(2)), "6:3:31":-1/np.sqrt(22)},
+                "2:1:20":{"6:1:20":6/np.sqrt(55), "6:1:30":2*np.sqrt(42/5), "6:1:40":6*np.sqrt(2/55)},
+                "4:1:20":{"6:1:20":-61/np.sqrt(770), "6:1:30":8*np.sqrt(3/5), "6:1:40":-6/np.sqrt(385)},
+                "4:1:21":{"6:1:10":3*np.sqrt(22), "6:1:20":np.sqrt(2/7), "6:1:30":-np.sqrt(3), "6:1:40":1/np.sqrt(7)},
+                "4:1:22":{"6:1:99":-4*np.sqrt(33/5), "6:1:20":-1/np.sqrt(22), "6:1:40":2/np.sqrt(11)}},
+                "f7":
+                {"3:4:99":{"7:4:22":-12*np.sqrt(11)},
+                "3:4:10":{"7:4:21":6*np.sqrt(33)},
+                "3:4:20":{"7:4:20":-np.sqrt(5/7), "7:4:21":2*np.sqrt(11/7), "7:4:22":-1},
+                "3:2:11":{"7:2:30":2*np.sqrt(10)},
+                "3:2:20":{"7:2:20":-16/np.sqrt(77), "7:2:30":-2*np.sqrt(6), "7:2:40":6*np.sqrt(2/77)},
+                "3:2:21":{"7:2:10":-np.sqrt(66), "7:2:20":np.sqrt(6/7), "7:2:30":1, "7:2:40":np.sqrt(3/7)}}}
+
+
+        def l_Ck_l1(l, k, l1):
+            return (-1)**l*np.sqrt((2*l+1)*(2*l1+1))*Wigner_coeff.threej_symbol([[l, k, l1],[0, 0, 0]])
+
+        def Vee(label1v, label1v1):
+
+            idxv = term_label.index(label1v)
+            Sv, Lv, vv = term_basis[idxv]
+            Sv /= 2
+
+            idxv1 = term_label.index(label1v1)
+            Sv1, Lv1, vv1 = term_basis[idxv1]
+            Sv1 /= 2
+
+            ck_list = np.zeros(len(range(0,2*self.l+1,2)))
+            for i,k in enumerate(range(0,2*self.l+1,2)):
+                ck = 0
+                if k!=0:
+                    ck += 0.5*l_Ck_l1(self.l, k, self.l)**2
+                    somma = 0
+                    for ii, term in enumerate(term_basis):
+                        if self.TAB == False:
+
+                            label2 = term_label[ii]
+                            S1, L1, v1 = term_basis[ii]  #2S, L, v
+                            S1 /= 2
+
+                            if label2[0]==label1v[0]:
+                                somma += self.rme.Uk(k, n=self.N, v=vv, L=Lv, S=Sv, v1=v1, L1=L1, S1=S1, label1=label1v, label2=label2)*self.rme.Uk(k, n=self.N, v=vv1, L=Lv1, S=Sv1, v1=v1, L1=L1, S1=S1, label1=label1v1, label2=label2)  #questi non sono quelli di closed shell
+                        else:
+
+                            label2 = term_label[ii]
+                            if label2[0]==label1v[0]:
+                                try:
+                                    somma += self.rme['U'+str(k)][label1v][label2]*self.rme['U'+str(k)][label1v1][label2]
+                                except:
+                                    somma += 0
+                                # print(somma)
+                    #exit()
+                    somma *= 1/(2*Lv+1)
+                    if self.v==self.v1:
+                        somma -= self.n/(2*self.l+1)
+                    ck *= somma
+                else:
+                    if self.v==self.v1:
+                        ck = self.n*(self.n-1)/2
+                if self.closed==True:
+                    #ck *= (-1)**((self.v1-self.v)/2.)
+                    if self.v==self.v1:
+                        ck -= (2*self.l+1-self.n)/(2*self.l+1)*l_Ck_l1(self.l, k, self.l)**2
+                else:
+                    pass
+                ck_list[i] = ck
+
+            return ck_list
+
+        def calc_ek(conf, label1, label2, S, L, dic_ek): 
+            #dic_ek [n:v:U:2S+1:L][n:v1:U1:2S+1:L] 
+            v,W,U = terms_labels_symm(self.conf)[label1]
+            v1,W1,U1 = terms_labels_symm(self.conf)[label2]
+            ek_coeff = np.zeros(4)
+            n = int(conf[1:])
+            ek_coeff[0] = n*(n-1)/2   
+            if v==v1:
+                ek_coeff[1] = 9*(n - v)/2 + 1/4*v*(v+2) - S*(S+1)
+                if v!=2*S and W==W1 and int(str(W)[0])==2:
+                    factor1 = x_g[W][U][U1]
+                    factor2 = chi_L[U1][L][U]
+                    if isinstance(factor1, float):
+                        ek_coeff[2] = factor1*factor2
+                    else:
+                        ek_coeff[2] = np.sum(np.array(factor1)*np.array(factor2))
+                    if S in S_list and v in v_list:
+                        ek_coeff[2] *= -1
+                if v==2*S+1+1:
+                    ek_coeff[3] = -3*omegaUL(U,L)
+                if v==n and (v==6 or v==7):
+                    ek_coeff[3] = 0
+                key1 = ':'.join([str(v),str(v),str(U),str(2*S+1),L])
+                key2 = ':'.join([str(v),str(v),str(U1),str(2*S+1),L])
+                if key1 in dic_ek.keys():
+                    if key2 in dic_ek[key1].keys():
+                        if n==v+2:
+                            ek_coeff[3] = dic_ek[key1][key2]*(1-v)/(7-v)
+                        elif n==v+4:
+                            ek_coeff[3] = dic_ek[key1][key2]*(-4)/(7-v)
+            else:
+                if n==5 and v==1 and v1==3 and (2*S+1)==2:
+                    key1 = ':'.join(['3',str(v),str(U),str(2*S+1),L])
+                    key2 = ':'.join(['3',str(v1),str(U1),str(2*S+1),L])
+                    if key1 in dic_ek.keys():
+                        if key2 in dic_ek[key1].keys():
+                            ek_coeff[3] = dic_ek[key1][key2]*np.sqrt(2/5)
+                if n==6 and v==0 and v1==4 and (2*S+1)==1:
+                    key1 = ':'.join(['4',str(v),str(U),str(2*S+1),L])
+                    key2 = ':'.join(['4',str(v1),str(U1),str(2*S+1),L])
+                    if key1 in dic_ek.keys():
+                        if key2 in dic_ek[key1].keys():
+                            ek_coeff[3] = dic_ek[key1][key2]*np.sqrt(9/5)
+                if n==6 and v==2 and v1==4:
+                    key1 = ':'.join(['4',str(v),str(U),str(2*S+1),L])
+                    key2 = ':'.join(['4',str(v1),str(U1),str(2*S+1),L])
+                    if key1 in dic_ek.keys():
+                        if key2 in dic_ek[key1].keys():
+                            ek_coeff[3] = dic_ek[key1][key2]*np.sqrt(1/6)
+                if n==7 and v==1 and v1==5 and (2*S+1)==2:
+                    key1 = ':'.join(['5',str(v),str(U),str(2*S+1),L])
+                    key2 = ':'.join(['5',str(v1),str(U1),str(2*S+1),L])
+                    if key1 in dic_ek.keys():
+                        if key2 in dic_ek[key1].keys():
+                            ek_coeff[3] = dic_ek[key1][key2]*np.sqrt(3/2)
+
+            key1 = ':'.join([str(v),str(2*S+1),str(U)])
+            key2 = ':'.join([str(v1),str(2*S+1),str(U1)])
+            if key1 in y_g[conf]:
+                if key2 in y_g[conf][key1]:
+                    ek_coeff[3] = y_g[conf][key1][key2]*phi_L[U1][L][U]
+
+            key1 = ':'.join([str(n),str(v),str(U),str(2*S+1),L])
+            key2 = ':'.join([str(n),str(v1),str(U1),str(2*S+1),L])
+            if key1 not in dic_ek.keys():
+                dic_ek[key1] = {}
+            else:
+                if key2 not in dic_ek[key1].keys():
+                    dic_ek[key1][key2] = ek_coeff
+            return dic_ek
+
+                    
+        #=======================================================================
+
+        if eval_bool==False:
+            F0, F2, F4, F6 = symbols("F0, F2, F4, F6")
+            coeff = [F0, F2, F4, F6]
+        else:
+            coeff = [F0, F2, F4, F6]
+
+        if tab_ee is not None:
+            # pprint(tab_ee)
+            coeff_ee = {}
+            for key1 in tab_ee.keys():
+                try:
+                    var = coeff_ee[key1]
+                except:
+                    coeff_ee[key1] = {}
+                for key2 in tab_ee[key1].keys():
+                    numero = tab_ee[key1][key2]
+
+                    if len(numero)!=1:
+                        try:
+                            numero = [numero[ii].replace(stringa,'') for ii,stringa in enumerate(['F0', 'F2', 'F4', 'F6'])]
+                        except:
+                            numero = [numero[ii].replace(stringa,'') for ii,stringa in enumerate(['F2', 'F4', 'F6'])]
+                    else:
+                        numero = 0
+                    
+                    if numero!=0:
+                        for ii in range(len(numero)):
+                            numero[ii]=numero[ii].replace('(', '*np.sqrt(')
+
+                            if '+/' in numero[ii] or '-/' in numero[ii]:
+                                numero[ii] = numero[ii].replace('+','+1')
+                                numero[ii] = numero[ii].replace('-','-1')
+
+                            numero[ii] = eval(numero[ii])
+
+                    if numero!=0:
+                        if len(numero)<4:
+                            while len(numero)<4:
+                                numero.insert(0,0)
+                    else:
+                        numero = [0,0,0,0]
+
+
+                    coeff_ee[key1].update({key2:numero})
+                    if key1!=key2:
+                        try:
+                            coeff_ee[key2].update({key1:numero})
+                        except:
+                            coeff_ee[key2]={}
+                            coeff_ee[key2].update({key1:numero})
+
+        term_basis = np.array(terms_basis(self.conf[0]+str(self.n)))
+        term_label = terms_labels(self.conf[0]+str(self.n))
+        ck_coeff = np.zeros(len(range(0,2*self.l+1,2)))
+        ck_coeff_back = np.zeros(len(range(0,2*self.l+1,2)))
+        for i, term in enumerate(term_basis):
+            if tab_ee is not None:
+                ck_coeff += np.array(coeff_ee[term_label[i]][term_label[i]])*(term[0]+1)*(2*term[1]+1)
+                ck_coeff_back += np.array(coeff_ee[term_label[i]][term_label[i]])*(term[0]+1)*(2*term[1]+1)
+            else:
+                ck_coeff += np.array(Vee(term_label[i], term_label[i]), dtype='float64')*(term[0]+1)*(2*term[1]+1)
+
+        ck_coeff /= basis.shape[0]
+        ck_coeff_back /= basis.shape[0]
+
+        integral = 0
+        label1v = self.label1
+        label1v1 = self.label2
+        if tab_ee is not None:
+            try:
+                ck = np.array(coeff_ee[label1v][label1v1])
+            except:
+                ck = np.zeros(4)
+        else:
+            ck = Vee(label1v, label1v1)
+
+        print(label1v, label1v1)
+        print(terms_labels_symm(self.conf)[label1v])
+
+        Ek_coeff = np.zeros(4)
+        Ek_coeff[0] = coeff[0] - 10/225*coeff[1] - 33/1089*coeff[2] - 286*25/184041*coeff[3]
+        Ek_coeff[1] = 1/9*(70/225*coeff[1] + 231/1089*coeff[2] + 2002*25/184041*coeff[3])
+        Ek_coeff[2] = 1/9*(1/225*coeff[1] - 3/1089*coeff[2] + 7*25/184041*coeff[3])
+        Ek_coeff[3] = 1/3*(5/225*coeff[1] + 6/1089*coeff[2] - 91*25/184041*coeff[3])
+
+        for i,_ in enumerate(range(0,2*self.l+1,2)):
+            if self.v==self.v1:
+                integral += (ck[i] - ck_coeff[i])*coeff[i]
+
+            else:
+                integral += ck[i]*coeff[i]
+
+        print(self.v, self.v1)
+        print(integral, ck, coeff)
+        print(np.sum(ek_coeff*Ek_coeff), ek_coeff, Ek_coeff)
+        if self.v!=self.v1:
+            exit()
+        
+
         return integral
 
     def SO_coupling(self, zeta, k=1, eval=True):
@@ -948,9 +1415,9 @@ class Hamiltonian():
                     Uk = self.rme['U'+str(k)][self.label1][self.label2]
                 except:
                     Uk = 0
-            #print(k,self.label1,self.label2,f'{Uk:.16f}')
+           
             coeff2 = Wigner_coeff.sixj_symbol([[self.J, self.J1, k],[self.L1, self.L, self.S]])
-            #print(coeff2, [[self.J, self.J1, k],[self.L1, self.L, self.S]])
+           
             int = 0
             for q in range(0,k+1):
                 if q==0:
@@ -963,10 +1430,7 @@ class Hamiltonian():
                     Ckqp = (-1)**(2*self.J + self.L1 + self.S - self.M + k)*np.sqrt((2*self.J+1)*(2*self.J1+1))*ckk*coeffp*coeff2*Uk
                     Ckqm = (-1)**(2*self.J + self.L1 + self.S - self.M + k)*np.sqrt((2*self.J+1)*(2*self.J1+1))*ckk*coeffm*coeff2*Uk
                     int += dic_kq[f'{k}'][f'{q}']*(Ckqm+(-1)**q*Ckqp) + 1j*dic_kq[f'{k}'][f'{-q}']*(Ckqm - (-1)**q*Ckqp)
-                    dic1 = dic_kq[f'{k}'][f'{q}']
-                    dic2 = dic_kq[f'{k}'][f'{-q}']
-                    # print('Bkq',k,q,f'{dic1:.16f}',f'{dic2:.16f}')
-                    # print('Ckq',k,q,f'{Ckqm:.16f}',f'{Ckqp:.16f}')
+
             result += int
 
         return result
@@ -1118,19 +1582,21 @@ def Full_basis(conf):
     basis_l = np.array(basis_l)
     basis_l_JM = np.array(basis_l_JM)
 
+    #ordering of basis (??)
     #[2S, L, 2J, 2M, sen]
-    if (conf[0]=='f' and n_el>7) or (conf[0]=='d' and n_el>5):
-        indices = np.lexsort((basis[:, 4], basis[:, 3], -basis[:, 2], -basis[:, 1], -basis[:, 0]))
-    else:
-        indices = np.lexsort((basis[:, 4], basis[:, 3], basis[:, 2], -basis[:, 1], -basis[:, 0]))  #the last one is the first criteria
-    basis = basis[indices]
-    basis_l = basis_l[indices]
-    basis_l_JM = basis_l_JM[indices]
+    # if (conf[0]=='f' and n_el>7) or (conf[0]=='d' and n_el>5):
+    #     indices = np.lexsort((basis[:, 4], basis[:, 3], -basis[:, 2], -basis[:, 1], -basis[:, 0]))
+    # else:
+    #     indices = np.lexsort((basis[:, 4], basis[:, 3], basis[:, 2], -basis[:, 1], -basis[:, 0]))  #the last one is the first criteria
+    # basis = basis[indices]
+    # basis_l = basis_l[indices]
+    # basis_l_JM = basis_l_JM[indices]
+    # sorted_keys = [list(dic_LS.keys())[i] for i in indices]
+    # dic_LS_sorted = {k: dic_LS[k] for k in sorted_keys}
 
-    sorted_keys = [list(dic_LS.keys())[i] for i in indices]
-    dic_LS_sorted = {k: dic_LS[k] for k in sorted_keys}
+    # exit()
 
-    return basis, dic_LS_sorted, basis_l, basis_l_JM
+    return basis, dic_LS, basis_l, basis_l_JM
 
 #@cron
 def diagonalisation(matrix, wordy=False):
@@ -1147,9 +1613,14 @@ def diagonalisation(matrix, wordy=False):
     return w,v
 
 
-class calculation():  #classe principale
+class calculation():  
 
     def __init__(self, conf, ground_only=False, TAB=False, wordy=True):
+
+        conf_list_d = ['d1','d2','d3','d4','d5','d6','d7','d8','d9']
+        conf_list_f = ['f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12','f13']
+        if conf not in conf_list_d and conf not in conf_list_f:
+            raise ValueError('Configuration not valid')
 
         if conf[0]=='d':
             self.l = 2
@@ -1191,7 +1662,6 @@ class calculation():  #classe principale
 
         self.dic_cfp, self.tables, self.dic_LS_almost, self.dic_ee = self.Tables(TAB, stringa, conf)
 
-
     def ground_state_calc(self, ground=None):
         #basis --> array: n. microstates x [2S, L, 2J, 2M, sen]
         #dic_LS --> dict: '[2S, L, 2J, 2M, sen (,count)]': label as N. and K.
@@ -1214,22 +1684,44 @@ class calculation():  #classe principale
         return basis_red, dic_LS_red, basis_l_red, basis_l_JM_red
 
     def Tables(self, TAB, stringa, conf):
-
-        if TAB==False:
-            dic_cfp = cfp_from_file(stringa)
-            tables = None
-            if self.closed==True:
-                dic_LS_almost = Full_basis(conf[0]+str(self.n+1), self.n+1)[1]  #questa è la dic_LS della configurazione corrispondente per i cfp
-            else:
+        
+        if conf=='d1' or conf=='f1':
+            if conf=='d1':
+                tables = {'U2': {'2D': {'2D': np.float64(1.0)}},
+                        'U4': {'2D': {'2D': np.float64(1.0)}},
+                        'V11': {'2D': {'2D': np.float64(1.224744871391589)}}}
+                dic_ee = {'2D': {'2D': [0,0,0,0]}}
                 dic_LS_almost = None
-            dic_ee = None
+                dic_ee = None
+                dic_cfp = None
+            else:
+                tables = {'U1': {'2F': {'2F': np.float64(1.0)}},
+                    'U2': {'2F': {'2F': np.float64(1.0)}},
+                    'U3': {'2F': {'2F': np.float64(1.0)}},
+                    'U4': {'2F': {'2F': np.float64(1.0)}},
+                    'U5': {'2F': {'2F': np.float64(1.0)}},
+                    'U6': {'2F': {'2F': np.float64(1.0)}},
+                    'V11': {'2F': {'2F': np.float64(1.224744871391589)}}}
+                dic_ee = {'2F': {'2F': [0,0,0,0]}}
+                dic_LS_almost = None
+                dic_ee = None
+                dic_cfp = None
         else:
-            dic_cfp = None
-            tables = read_matrix_from_file(self.conf, self.closed)
-            dic_LS_almost = None
-            dic_ee = None
-            if self.l==3:# and (self.n>=4 and self.n<=7):
-                dic_ee = read_ee_int(self.conf, self.closed)
+            if TAB==False:
+                dic_cfp = cfp_from_file(stringa)
+                tables = None
+                if self.closed==True:
+                    dic_LS_almost = Full_basis(conf[0]+str(self.n+1))[1]   #, self.n+1)[1]  #questa è la dic_LS della configurazione corrispondente per i cfp
+                else:
+                    dic_LS_almost = None
+                dic_ee = None
+            else:
+                dic_cfp = None
+                tables = read_matrix_from_file(self.conf, self.closed)
+                dic_LS_almost = None
+                dic_ee = None
+                if self.l==3 and self.n>2:
+                    dic_ee = read_ee_int(self.conf, self.closed)
 
         return dic_cfp, tables, dic_LS_almost, dic_ee
 
@@ -1341,7 +1833,7 @@ class calculation():  #classe principale
                     unique_max_proj.append(item)
             max_proj = unique_max_proj
 
-        # print(max_proj)
+        #fai quello completo e controlla la composizione
 
         basis_update = np.copy(self.basis)
         basis_l_update = np.copy(self.basis_l)
@@ -1374,7 +1866,7 @@ class calculation():  #classe principale
     #@njit
     #@cron
     def MatrixH(self, elem, F0=0, F2=0, F4=0, F6=0, zeta=0, k=1, dic_V=None, dic_bkq = None,dic_AOM = None, PCM = None, field = [0.,0.,0.], cfp_angles = None, evaluation=True,wordy=False,
-                      Orth=False, Norm=False, eig_opt=False, ground_proj=False, return_proj=False, save_label=False, save_LF=False):
+                      Orth=False, Norm=False, eig_opt=False, ground_proj=False, return_proj=False, save_label=False, save_LF=False, save_matrix=False):
         #PCM is the old Stev
 
         print('\nPerforming calculation with the following contributions: \n' if wordy else "", end = "")
@@ -1410,7 +1902,7 @@ class calculation():  #classe principale
             pass
 
         self.par_dict = {'F0':F0, 'F2':F2, 'F4':F4, 'F6':F6, 'zeta':zeta, 'k':k, 'dic_bkq':dic_bkq, 'field':field}  # it's for the magnetic properties calculation
-        matrix = self.build_matrix(elem, F0, F2, F4, F6, zeta, k, dic_bkq, field, evaluation, save_label, save_LF)
+        matrix = self.build_matrix(elem, F0, F2, F4, F6, zeta, k, dic_bkq, field, evaluation, save_label, save_LF, save_matrix)
         # matrix = np.conj(matrix)  #se metto questo add_Zeeman va cambiato
         # print(matrix)
         # exit()
@@ -1474,7 +1966,7 @@ class calculation():  #classe principale
             return result
 
     # @cron
-    def build_matrix(self, elem, F0=0, F2=0, F4=0, F6=0, zeta=0, k=1, dic_bkq = None, field = [0.,0.,0.], evaluation=True, save_label=False, save_LF=False):
+    def build_matrix(self, elem, F0=0, F2=0, F4=0, F6=0, zeta=0, k=1, dic_bkq = None, field = [0.,0.,0.], evaluation=True, save_label=False, save_LF=False, save_matrix=False):
 
         F = F0, F2, F4, F6
 
@@ -1486,14 +1978,12 @@ class calculation():  #classe principale
         else:
             fac = 1.
 
-        compare = []
-        # matrix = np.zeros((basis.shape[0],basis.shape[0]),dtype='object')
         matrix = np.zeros((basis.shape[0],basis.shape[0]),dtype='complex128')
         if save_label:
             label_matrix = []
         if save_LF:
             LF_matrixs = np.zeros_like(matrix)
-        list_labels = []
+
         for i in range(basis.shape[0]):
             statei = basis[i]
             Si = statei[0]/2.
@@ -1506,8 +1996,6 @@ class calculation():  #classe principale
             if save_label:
                 label_matrix.append([Si*2,Li,Ji*2,MJi*2,seni])
 
-            # print(i)
-            # print('\ni',i, Li,2*Si,2*Ji,2*MJi)
             for j in range(0,i+1):
                 statej = basis[j]
                 Sj = statej[0]/2.
@@ -1516,13 +2004,12 @@ class calculation():  #classe principale
                 MJj = statej[3]/2.
                 senj = statej[-1]
                 labelj = dic_LS[':'.join([f'{qq}' for qq in statej])]
-                # print('j',j, Lj,2*Sj,2*Jj,2*MJj)
+                
                 H = Hamiltonian([seni,Li,Si,senj,Lj,Sj,Ji,MJi,Jj,MJj], [labeli,labelj], self.conf, self.dic_cfp, self.tables, dic_LS, self.dic_LS_almost)  #self.conf è quella del main
 
                 if 'Hee' in elem:
                     if Ji==Jj and MJi==MJj:
                         if Li == Lj and Si == Sj:
-                            #print(labeli, labelj)
                             if self.l==3:
                                 Hee = H.electrostatic_int(basis, *F, eval_bool=evaluation, tab_ee = self.dic_ee)
                             else:
@@ -1560,20 +2047,21 @@ class calculation():  #classe principale
                 if 'Hz' in elem:
                     if Li==Lj and Si==Sj and seni==senj:
                         Hz = H.Zeeman(field, k, eval=evaluation)
-                        # print(Hz)
                         matrix[i,j] += Hz
                         if i != j:
                             matrix[j,i] += np.conj(Hz)
 
                 else:
                     pass
-
+                
                 #print(matrix[i,j].real)
 
         if save_label:
             np.savetxt('matrix_label.txt', np.array(label_matrix))
         if save_LF:
             np.save('matrix_LF', LF_matrixs, allow_pickle=True, fix_imports=False)
+        if save_matrix:
+            np.save('matrix', matrix, allow_pickle=True, fix_imports=False)
 
         return matrix
 
@@ -3805,12 +4293,16 @@ def coeff_multipole_moments(conf, J, M, L=0, S=0):
 #######READ FROM FILE########
 
 def cfp_from_file(conf):
-    #i valori di cfp sono letti da Nielson e Koster e sono scritti con lo stesso formalismo.
-    #la conf es per un d8 deve essere d3, per un d3 deve essere d3
 
     prime = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37]
 
-    file = open('cfp_d_conf.txt', 'r').readlines()
+    if conf[0]=='d':
+        file = open('tables/cfp_d_conf.txt', 'r').readlines()
+    elif conf[0]=='f':
+        file = open('tables/cfp_f_conf.txt', 'r').readlines()
+    else:
+        raise ValueError('conf must be dn or fn')
+    
     check = False
     cfp = []
     for i,line in enumerate(file):
@@ -3829,7 +4321,7 @@ def cfp_from_file(conf):
             factor = int(splitline[2])
             number = 1
             if len(splitline)>3:
-                splitline[-1] = splitline[-1].split(' ')
+                splitline[-1] = splitline[-1].split()
                 for j in range(len(splitline[-1])):
                     number *= prime[j]**int(splitline[-1][j])
             number = np.sqrt(number)
@@ -4056,6 +4548,13 @@ def terms_labels(conf):
     #questi dati sono presi da Boca, "theoretical fundations of molecular magnetism" (Ch 8, p 381, Tab 8.4)
     #oppure da OctoYot f_e_data.f90, TS_d_labels (seguono l'ordine di Nielson e Koster)
 
+    if conf[0]=='d' and int(conf[1:])>5:
+        conf = 'd'+str(almost_closed_shells(conf))
+    elif conf[0]=='f' and int(conf[1:])>7:
+        conf = 'f'+str(almost_closed_shells(conf))
+    else:
+        pass
+
     legenda={'d1': ['2D'],
              'd2': ['3P','3F','1S','1D','1G'],
              'd3': ['4P','4F','2P','2D1','2D2','2F','2G','2H'],
@@ -4095,6 +4594,401 @@ def terms_basis(conf):
 
     return legenda[conf]
 
+def terms_labels_symm(conf):
+
+    if conf[0]=='d' and int(conf[1:])>5:
+        conf = 'd'+str(almost_closed_shells(conf))
+    elif conf[0]=='f' and int(conf[1:])>7:
+        conf = 'f'+str(almost_closed_shells(conf))
+    else:
+        pass
+
+    legenda = {'f1':{'2F':[1, 100, 10]},
+        'f2':{'3P':[2, 110, 11],
+            '3F':[2, 110, 10],
+            '3H':[2, 110, 11],
+            '1S':[0, 999, 99],
+            '1D':[2, 200, 20],
+            '1G':[2, 200, 20],
+            '1I':[2, 200, 20]},
+        'f3':{'4S':[3, 111, 99],
+            '4D':[3, 111, 20],
+            '4F':[3, 111, 10],
+            '4G':[3, 111, 20],
+            '4I':[3, 111, 20],
+            '2P':[3, 210, 11],
+            '2D1':[3, 210, 20],
+            '2D2':[3, 210, 21],
+            '2F1':[1, 100, 10],
+            '2F2':[3, 210, 21],
+            '2G1':[3, 210, 20],
+            '2G2':[3, 210, 21],
+            '2H1':[3, 210, 11],
+            '2H2':[3, 210, 21],
+            '2I':[3, 210, 20],
+            '2K':[3, 210, 21],
+            '2L':[3, 210, 21]},
+        'f4':{'5S':[4, 111,99],
+            '5D':[4, 111, 20],
+            '5F':[4, 111, 10],
+            '5G':[4, 111, 20],
+            '5I':[4, 111, 20],
+            '3P1':[2, 110, 11],
+            '3P2':[4, 211, 11],
+            '3P3':[4, 211, 30],
+            '3D1':[4, 211, 20],
+            '3D2':[4, 211, 21],
+            '3F1':[2, 110, 10],
+            '3F2':[4, 211, 10],
+            '3F3':[4, 211, 21],
+            '3F4':[4, 211, 30],
+            '3G1':[4, 211, 20],
+            '3G2':[4, 211, 21],
+            '3G3':[4, 211, 30],
+            '3H1':[2, 110, 11],
+            '3H2':[4, 211, 11],
+            '3H3':[4, 211, 21],
+            '3H4':[4, 211, 30],
+            '3I1':[4, 211, 20],
+            '3I2':[4, 211, 30],
+            '3K1':[4, 211, 21],
+            '3K2':[4, 211, 30],
+            '3L':[4, 211, 21],
+            '3M':[4, 211, 30],
+            '1S1':[0,999,99],
+            '1S2':[4, 220, 22],
+            '1D1':[2, 200, 20],
+            '1D2':[4, 220, 20],
+            '1D3':[4, 220, 21],
+            '1D4':[4, 220, 22],
+            '1F':[4, 220, 21],
+            '1G1':[2, 200, 20],
+            '1G2':[4, 220, 20],
+            '1G3':[4, 220, 21],
+            '1G4':[4, 220, 22],
+            '1H1':[4, 220, 21],
+            '1H2':[4, 220, 22],
+            '1I1':[2, 200, 20],
+            '1I2':[4, 220, 20],
+            '1I3':[4, 220, 22],
+            '1K':[4, 220, 21],
+            '1L1':[4, 220, 21],
+            '1L2':[4, 220, 22],
+            '1N':[4, 220, 22]},
+        'f5':{'6P':[5, 110, 11],
+            '6F':[5, 110, 10],
+            '6H':[5, 110, 11],
+            '4S':[3, 111, 99],
+            '4P1':[5, 211, 11],
+            '4P2':[5, 211, 30],
+            '4D1':[3, 111, 20],
+            '4D2':[5, 211, 20],
+            '4D3':[5, 211, 21],
+            '4F1':[3, 111, 10],
+            '4F2':[5, 211, 10],
+            '4F3':[5, 211, 21],
+            '4F4':[5, 211, 30],
+            '4G1':[3, 111, 20],
+            '4G2':[5, 211, 20],
+            '4G3':[5, 211, 21],
+            '4G4':[5, 211, 30],
+            '4H1':[5, 211, 11],
+            '4H2':[5, 211, 21],
+            '4H3':[5, 211, 30],
+            '4I1':[3, 111, 20],
+            '4I2':[5, 211, 20],
+            '4I3':[5, 211, 30],
+            '4K1':[5, 211, 21],
+            '4K2':[5, 211, 30],
+            '4L':[5, 211, 21],
+            '4M':[5, 211, 30],
+            '2P1':[3, 210, 11],
+            '2P2':[5, 221, 11],
+            '2P3':[5, 221, 30],
+            '2P4':[5, 221, 31],
+            '2D1':[3, 210, 20],
+            '2D2':[3, 210, 21],
+            '2D3':[5, 221, 20],
+            '2D4':[5, 221, 21],
+            '2D5':[5, 221, 31],
+            '2F1':[1, 100, 10],
+            '2F2':[3, 210, 21],
+            '2F3':[5, 221, 10],
+            '2F4':[5, 221, 21],
+            '2F5':[5, 221, 30],
+            '2F6':[5, 221, 31],
+            '2F7':[5, 221, 31],
+            '2G1':[3, 210, 20],
+            '2G2':[3, 210, 21],
+            '2G3':[5, 221, 20],
+            '2G4':[5, 221, 21],
+            '2G5':[5, 221, 30],
+            '2G6':[5, 221, 31],
+            '2H1':[3, 210, 11],
+            '2H2':[3, 210, 21],
+            '2H3':[5, 221, 11],
+            '2H4':[5, 221, 21],
+            '2H5':[5, 221, 30],
+            '2H6':[5, 221, 31],
+            '2H7':[5, 221, 31],
+            '2I1':[3, 210, 20],
+            '2I2':[5, 221, 20],
+            '2I3':[5, 221, 30],
+            '2I4':[5, 221, 31],
+            '2I5':[5, 221, 31],
+            '2K1':[3, 210, 21],
+            '2K2':[5, 221, 21],
+            '2K3':[5, 221, 30],
+            '2K4':[5, 221, 31],
+            '2K5':[5, 221, 31],
+            '2L1':[3, 210, 21],
+            '2L2':[5, 221, 21],
+            '2L3':[5, 221, 31],
+            '2M1':[5, 221, 30],
+            '2M2':[5, 221, 31],
+            '2N':[5, 221, 31],
+            '2O':[5, 221, 31]},
+        'f6':{'7F':[6, 100, 10],
+            '5S':[4, 111, 99],
+            '5P':[6, 210, 11],
+            '5D1':[4, 111, 20],
+            '5D2':[6, 210, 20],
+            '5D3':[6, 210, 21],
+            '5F1':[4, 111, 10],
+            '5F2':[6, 210, 21],
+            '5G1':[4, 111, 20],
+            '5G2':[6, 210, 20],
+            '5G3':[6, 210, 21],
+            '5H1':[6, 210, 11],
+            '5H2':[6, 210, 21],
+            '5I1':[4, 111, 20],
+            '5I2':[6, 210, 20],
+            '5K':[6, 210, 21],
+            '5L':[6, 210, 21],
+            '3P1':[2, 110, 11],
+            '3P2':[4, 211, 11],
+            '3P3':[4, 211, 30],
+            '3P4':[6, 221, 11],
+            '3P5':[6, 221, 30],
+            '3P6':[6, 221, 31],
+            '3D1':[4, 211, 20],
+            '3D2':[4, 211, 21],
+            '3D3':[6, 221, 20],
+            '3D4':[6, 221, 21],
+            '3D5':[6, 221, 31],
+            '3F1':[2, 110, 10],
+            '3F2':[4, 211, 10],
+            '3F3':[4, 211, 21],
+            '3F4':[4, 211, 30],
+            '3F5':[6, 221, 10],
+            '3F6':[6, 221, 21],
+            '3F7':[6, 221, 30],
+            '3F8':[6, 221, 31],
+            '3F9':[6, 221, 31],
+            '3G1':[4, 211, 20],
+            '3G2':[4, 211, 21],
+            '3G3':[4, 211, 30],
+            '3G4':[6, 221, 20],
+            '3G5':[6, 221, 21],
+            '3G6':[6, 221, 30],
+            '3G7':[6, 221, 31],
+            '3H1':[2, 110, 11],
+            '3H2':[4, 211, 11],
+            '3H3':[4, 211, 21],
+            '3H4':[4, 211, 30],
+            '3H5':[6, 221, 11],
+            '3H6':[6, 221, 21],
+            '3H7':[6, 221, 30],
+            '3H8':[6, 221, 31],
+            '3H9':[6, 221, 31],
+            '3I1':[4, 211, 20],
+            '3I2':[4, 211, 30],
+            '3I3':[6, 221, 20],
+            '3I4':[6, 221, 30],
+            '3I5':[6, 221, 31],
+            '3I6':[6, 221, 31],
+            '3K1':[4, 211, 21],
+            '3K2':[4, 211, 30],
+            '3K3':[6, 221, 21],
+            '3K4':[6, 221, 30],
+            '3K5':[6, 221, 31],
+            '3K6':[6, 221, 31],
+            '3L1':[4, 211, 21],
+            '3L2':[6, 221, 21],
+            '3L3':[6, 221, 31],
+            '3M1':[4, 211, 30],
+            '3M2':[6, 221, 30],
+            '3M3':[6, 221, 31],
+            '3N':[6, 221, 31],
+            '3O':[6, 221, 31],
+            '1S1':[0, 999, 99],
+            '1S2':[4, 220, 22],
+            '1S3':[6, 222, 99],
+            '1S4':[6, 222, 40],
+            '1P':[6, 222, 30],
+            '1D1':[2, 200, 20],
+            '1D2':[4, 220, 20],
+            '1D3':[4, 220, 21],
+            '1D4':[4, 220, 22],
+            '1D5':[6, 222, 20],
+            '1D6':[6, 222, 40],
+            '1F1':[4, 220, 21],
+            '1F2':[6, 222, 10],
+            '1F3':[6, 222, 30],
+            '1F4':[6, 222, 40],
+            '1G1':[2, 200, 20],
+            '1G2':[4, 220, 20],
+            '1G3':[4, 220, 21],
+            '1G4':[4, 220, 22],
+            '1G5':[6, 222, 20],
+            '1G6':[6, 222, 30],
+            '1G7':[6, 222, 40],
+            '1G8':[6, 222, 40],
+            '1H1':[4, 220, 21],
+            '1H2':[4, 220, 22],
+            '1H3':[6, 222, 30],
+            '1H4':[6, 222, 40],
+            '1I1':[2, 200, 20],
+            '1I2':[4, 220, 20],
+            '1I3':[4, 220, 22],
+            '1I4':[6, 222, 20],
+            '1I5':[6, 222, 30],
+            '1I6':[6, 222, 40],
+            '1I7':[6, 222, 40],
+            '1K1':[4, 220, 21],
+            '1K2':[6, 222, 30],
+            '1K3':[6, 222, 40],
+            '1L1':[4, 220, 21],
+            '1L2':[4, 220, 22],
+            '1L3':[6, 222, 40],
+            '1L4':[6, 222, 40],
+            '1M1':[6, 222, 30],
+            '1M2':[6, 222, 40],
+            '1N1':[4, 220, 22],
+            '1N2':[6, 222, 40],
+            '1Q':[6, 222, 40]},
+        'f7':{'8S':[7, 999, 99],
+            '6P':[5, 110, 11],
+            '6D':[7, 200, 20],
+            '6F':[5, 110, 10],
+            '6G':[7, 200, 20],
+            '6H':[5, 110, 11],
+            '6I':[7, 200, 20],
+            '4S1':[3, 111, 99],
+            '4S2':[7, 220, 22],
+            '4P1':[5, 211, 11],
+            '4P2':[5, 211, 30],
+            '4D1':[3, 111, 20],
+            '4D2':[5, 211, 20],
+            '4D3':[5, 211, 21],
+            '4D4':[7, 220, 20],
+            '4D5':[7, 220, 21],
+            '4D6':[7, 220, 22],
+            '4F1':[3, 111, 10],
+            '4F2':[5, 211, 10],
+            '4F3':[5, 211, 21],
+            '4F4':[5, 211, 30],
+            '4F5':[7, 220, 21],
+            '4G1':[3, 111, 20],
+            '4G2':[5, 211, 20],
+            '4G3':[5, 211, 21],
+            '4G4':[5, 211, 30],
+            '4G5':[7, 220, 20],
+            '4G6':[7, 220, 21],
+            '4G7':[7, 220, 22],
+            '4H1':[5, 211, 11],
+            '4H2':[5, 211, 21],
+            '4H3':[5, 211, 30],
+            '4H4':[7, 220, 21],
+            '4H5':[7, 220, 22],
+            '4I1':[3, 111, 20],
+            '4I2':[5, 211, 20],
+            '4I3':[5, 211, 30],
+            '4I4':[7, 220, 20],
+            '4I5':[7, 220, 22],
+            '4K1':[5, 211, 21],
+            '4K2':[5, 211, 30],
+            '4K3':[7, 220, 21],
+            '4L1':[5, 211, 21],
+            '4L2':[7, 220, 21],
+            '4L3':[7, 220, 22],
+            '4M':[5, 211, 30],
+            '4N':[7, 220, 22],
+            '2S1':[7, 222, 99],
+            '2S2':[7, 222, 40],
+            '2P1':[3, 210, 11],
+            '2P2':[5, 221, 11],
+            '2P3':[5, 221, 30],
+            '2P4':[5, 221, 31],
+            '2P5':[7, 222, 30],
+            '2D1':[3, 210, 20],
+            '2D2':[3, 210, 21],
+            '2D3':[5, 221, 20],
+            '2D4':[5, 221, 21],
+            '2D5':[5, 221, 31],
+            '2D6':[7, 222, 20],
+            '2D7':[7, 222, 40],
+            '2F1':[1, 100, 10],
+            '2F2':[3, 210, 21],
+            '2F3':[5, 221, 10],
+            '2F4':[5, 221, 21],
+            '2F5':[5, 221, 30],
+            '2F6':[5, 221, 31],
+            '2F7':[5, 221, 31],
+            '2F8':[7, 222, 10],
+            '2F9':[7, 222, 30],
+            '2F0':[7, 222, 40],
+            '2G1':[3, 210, 20],
+            '2G2':[3, 210, 21],
+            '2G3':[5, 221, 20],
+            '2G4':[5, 221, 21],
+            '2G5':[5, 221, 30],
+            '2G6':[5, 221, 31],
+            '2G7':[7, 222, 20],
+            '2G8':[7, 222, 30],
+            '2G9':[7, 222, 40],
+            '2G0':[7, 222, 40],
+            '2H1':[3, 210, 11],
+            '2H2':[3, 210, 21],
+            '2H3':[5, 221, 11],
+            '2H4':[5, 221, 21],
+            '2H5':[5, 221, 30],
+            '2H6':[5, 221, 31],
+            '2H7':[5, 221, 31],
+            '2H8':[7, 222, 30],
+            '2H9':[7, 222, 40],
+            '2I1':[3, 210, 20],
+            '2I2':[5, 221, 20],
+            '2I3':[5, 221, 30],
+            '2I4':[5, 221, 31],
+            '2I5':[5, 221, 31],
+            '2I6':[7, 222, 20],
+            '2I7':[7, 222, 30],
+            '2I8':[7, 222, 40],
+            '2I9':[7, 222, 40],
+            '2K1':[3, 210, 21],
+            '2K2':[5, 221, 21],
+            '2K3':[5, 221, 30],
+            '2K4':[5, 221, 31],
+            '2K5':[5, 221, 31],
+            '2K6':[7, 222, 30],
+            '2K7':[7, 222, 40],
+            '2L1':[3, 210, 21],
+            '2L2':[5, 221, 21],
+            '2L3':[5, 221, 31],
+            '2L4':[7, 222, 40],
+            '2L5':[7, 222, 40],
+            '2M1':[5, 221, 30],
+            '2M2':[5, 221, 31],
+            '2M3':[7, 222, 30],
+            '2M4':[7, 222, 40],
+            '2N1':[5, 221, 31],
+            '2N2':[7, 222, 40],
+            '2O':[5, 221, 31],
+            '2Q':[7, 222, 40]}}
+
+    return legenda[conf]
+
 def conv_Aqkrk_bkq(l,m):
     #conversion from stevens coefficients to wybourne formalism
 
@@ -4109,24 +5003,34 @@ def conv_Aqkrk_bkq(l,m):
     return legenda[str(l)][str(m)]
 
 def r_expect(k, conf):
-    # <r^k> from S. Edvarsson, M. Klintenberg, J. Alloys Compd. 1998, 275–277, 230
+    # in atomic units
 
     if isinstance(k, int):
         k = str(k)
 
     if k=='0':
         return 1
+
+    if conf[0]=='d':
+        # <r^k> from table 7.6 in A. Abragam and B. Bleaney, Electron Paramagnetic Resonance of Transition Ions, Dover, New York, 1986.
+        legenda = {'2':{'d2': 2.447,'d3': 2.070,'d4': 1.781,'d5': 1.548,'d6': 1.393,'d7': 1.251,'d8': 1.130,'d9': 1.028},
+                '4':{'d2': 13.17,'d3': 9.605,'d4': 7.211,'d5': 5.513,'d6': 4.496,'d7': 3.655,'d8': 3.003,'d9': 2.498}}
     else:
+        # <r^k> from S. Edvarsson, M. Klintenberg, J. Alloys Compd. 1998, 275–277, 230
         legenda = {'2':{'f1':1.456, 'f2':1.327, 'f3':1.222, 'f4':1.135, 'f5':1.061, 'f6':0.997, 'f7':0.942, 'f8':0.893, 'f9':0.849, 'f10':0.810, 'f11':0.773, 'f12':0.740, 'f13':0.710},
                 '4':{'f1':5.437, 'f2':4.537, 'f3':3.875, 'f4':3.366, 'f5':2.964, 'f6':2.638, 'f7':2.381, 'f8':2.163, 'f9':1.977, 'f10':1.816, 'f11':1.677, 'f12':1.555, 'f13':1.448},
                 '6':{'f1':42.26, 'f2':32.65, 'f3':26.12, 'f4':21.46, 'f5':17.99, 'f6':15.34, 'f7':13.36, 'f8':11.75, 'f9':10.44, 'f10':9.345, 'f11':8.431, 'f12':7.659, 'f13':7.003}}
-        return legenda[k][conf]
+    
+    return legenda[k][conf]
 
 def sigma_k(k, conf):
     # Sternheimer shielding parameters from S. Edvardsson, M. Klinterberg, J. Alloys Compd. 1998, 275, 233.
 
     if isinstance(k, int):
         k = str(k)
+
+    if conf[0] == 'd':
+        raise NotImplementedError("Stevens coefficients for d^n configurations are not implemented.")
 
     legenda = {'2':{'f1':0.510, 'f2':0.515, 'f3':0.518, 'f4':0.519, 'f5':0.519, 'f6':0.520, 'f7':0.521, 'f8':0.523, 'f9':0.527, 'f10':0.534, 'f11':0.544, 'f12':0.554, 'f13':0.571},
                '4':{'f1':0.0132, 'f2':0.0138, 'f3':0.0130, 'f4':0.0109, 'f5':0.0077, 'f6':0.0033, 'f7':-0.0031, 'f8':-0.0107, 'f9':-0.0199, 'f10':-0.0306, 'f11':-0.0427, 'f12':-0.0567, 'f13':-0.0725},
@@ -4137,6 +5041,9 @@ def Stev_coeff(k, conf):
     # Stevens coefficients (alpha=2, beta=4, gamma=6) from K. W. H. Stevens, Proc. Phys. Soc. 1952, 65, 209.
     # or table 20 from A. Abragam and B. Bleaney, Electron Paramagnetic Resonance of Transition Ions, Dover, New York, 1986.
     
+    if conf[0] == 'd':
+        raise NotImplementedError("Stevens coefficients for d^n configurations are not implemented.")
+
     legenda = {'2':{'f1':-2/35, 'f2':-52/(11*15**2), 'f3':-7/(33**2), 'f4':14/(11**2*15), 'f5':13/(7*45), 'f6':0, 'f7':0, 'f8':-1/99, 'f9':-2/(9*35), 'f10':-1/(30*15), 'f11':4/(45*35), 'f12':1/99, 'f13':2/63},
                '4':{'f1':2/(7*45), 'f2':-4/(55*33*3), 'f3':-8*17/(11**2*13*297), 'f4':952/(13*3**3*11**3*5), 'f5':26/(33*7*45), 'f6':0, 'f7':0, 'f8':2/(11*1485), 'f9':-8/(11*45*273), 'f10':-1/(11*2730), 'f11':2/(11*15*273), 'f12':8/(3*11*1485), 'f13':-2/(77*15)},
                '6':{'f1':0, 'f2':17*16/(7*11**2*13*5*3**4), 'f3':-17*19*5/(13**2*11**3*3**3*7), 'f4':2584/(11**2*13**2*3*63), 'f5':0, 'f6':0, 'f7':0, 'f8':-1/(13*33*2079), 'f9':4/(11**2*13**2*3**3*7), 'f10':-5/(13*33*9009), 'f11':8/(13**2*11**2*3**3*7), 'f12':-5/(13*33*2079), 'f13':4/(13*33*63)}}
@@ -4230,6 +5137,11 @@ def ground_term_legend(conf):
 
 def free_ion_param_f(conf):
     #Table 5 p 168 from C. Goerller-Walrand, K. Binnemans, Handbook of Physics & Chemistry of Rare Earths, Vol 23, Ch 155, (1996)
+
+    if conf=='f13' or conf=='f1':
+        print('Warning: '+conf+' is not included in free_ion_param_f(), redirected toward free_ion_param_f_HF()')
+        return free_ion_param_f_HF(conf)
+
     dict = {'f2':{'F2': 68323, 'F4': 49979, 'F6': 32589, 'zeta': 747},
             'f3':{'F2': 72295, 'F4': 52281, 'F6': 35374, 'zeta': 879},
             'f4':{'F2': 75842, 'F4': 54319, 'F6': 38945, 'zeta': 1023},
@@ -4245,7 +5157,8 @@ def free_ion_param_f(conf):
 
 def free_ion_param_f_HF(conf):
     # from Ma, C. G., Brik, M. G., Li, Q. X., & Tian, Y. (2014). Systematic analysis of spectroscopic characteristics of the lanthanide and actinide ions with the 4fN and 5fN (N= 1… 14) electronic configurations in a free state. Journal of alloys and compounds, 599, 93-101.
-    dict = {'f2':{'F2': 96681, 'F4': 60533, 'F6': 43509, 'zeta': 808},
+    dict = {'f1':{'F2': 0, 'F4': 0, 'F6': 0, 'zeta': 689},
+            'f2':{'F2': 96681, 'F4': 60533, 'F6': 43509, 'zeta': 808},
             'f3':{'F2': 100645, 'F4': 63030, 'F6': 45309, 'zeta': 937},
             'f4':{'F2': 104389, 'F4': 65383, 'F6': 47003, 'zeta': 1075},
             'f5':{'F2': 107971, 'F4': 67630, 'F6': 48619, 'zeta': 1225},
@@ -4257,6 +5170,43 @@ def free_ion_param_f_HF(conf):
             'f11':{'F2': 127240, 'F4': 79650, 'F6': 57248, 'zeta': 2396},
             'f12':{'F2': 130201, 'F4': 81489, 'F6': 58566, 'zeta': 2643},
             'f13':{'F2': 133119, 'F4': 83300, 'F6': 59864, 'zeta': 2906}}
+    return dict[conf]
+
+def free_ion_param_AB(conf):
+    # from Electron paramagnetic resonance of transition metal ions from Abragam e Bleany 
+
+    def from_BC_to_Fk(B,C,A=0):
+        ABC = np.array([A,B,C])
+        conv = np.array([[1,0,7/5],[0,49,49/7],[0,0,441/35]])
+        return np.dot(conv,ABC)
+
+    if conf[0]=='d':
+        # table 7.3
+        dict = {'d1':{'F2': from_BC_to_Fk(0,0)[1], 'F4': from_BC_to_Fk(0,0)[2], 'zeta':79.0},
+                'd2':{'F2': from_BC_to_Fk(694,2910)[1], 'F4': from_BC_to_Fk(694,2910)[2], 'zeta':120.0},
+                'd3':{'F2': from_BC_to_Fk(755,3257)[1], 'F4': from_BC_to_Fk(755,3257)[2], 'zeta':168.0},
+                'd4':{'F2': from_BC_to_Fk(810,3565)[1], 'F4': from_BC_to_Fk(810,3565)[2], 'zeta':236.0},
+                'd5':{'F2': from_BC_to_Fk(860,3850)[1], 'F4': from_BC_to_Fk(860,3850)[2], 'zeta':335.0},
+                'd6':{'F2': from_BC_to_Fk(917,4040)[1], 'F4': from_BC_to_Fk(917,4040)[2], 'zeta':404.0},
+                'd7':{'F2': from_BC_to_Fk(971,4497)[1], 'F4': from_BC_to_Fk(971,4497)[2], 'zeta':528.0},
+                'd8':{'F2': from_BC_to_Fk(1030,4850)[1], 'F4': from_BC_to_Fk(1030,4850)[2], 'zeta':644.0},
+                'd9':{'F2': from_BC_to_Fk(0,0)[1], 'F4': from_BC_to_Fk(0,0)[2], 'zeta':829.0}}
+
+    elif conf[0]=='f':
+        warnings.warn("Slater-Condon F^k from Abragam e Bleany are not available for f^n configurations.\nPlease use free_ion_param_f_HF() or free_ion_param_f() if .", UserWarning)
+        # table 5.3
+        dict = {'f1':{'zeta': 740},
+            'f2':{'zeta': 878},
+            'f3':{'zeta': 1024},
+            'f5':{'zeta': 1342},
+            'f7':{'zeta': 1717},
+            'f8':{'zeta': 1915},
+            'f9':{'zeta': 2182},
+            'f10':{'zeta': 2360},
+            'f11':{'zeta': 2610},
+            'f12':{'zeta': 2866},
+            'f13':{'zeta': 3161}}
+
     return dict[conf]
 
 def COLORS_list():
@@ -4622,7 +5572,7 @@ def is_float(s):
     except ValueError:
         return False
     
-def read_AILFT_orca6(filename, conf, method='CASSCF', return_V=False, rotangle_V=False, print_orcamatrix=False):
+def read_AILFT_orca6(filename, conf, method='CASSCF', return_V=False, rotangle_V=False, return_orcamatrix=False):
     # rotate_V is a list of angles to rotate the V matrix
     # rotangle_V = [alpha, beta, gamma] or [q0, q1, q2, q3]
     # euler angles are in scipy convention 'ZYZ'
@@ -4685,8 +5635,8 @@ def read_AILFT_orca6(filename, conf, method='CASSCF', return_V=False, rotangle_V
 
         matrix = adjust_phase_matrix(matrix)
 
-        if print_orcamatrix:
-            print("\n*phase adjusted orca matrix\n",matrix)
+        if return_orcamatrix:
+            return matrix
 
         ### change to order 0 -1 1 -2 2 -3 3 
         mask = [[(0,0), (2,0), (1,0), (4,0), (3,0), (6,0), (5,0)],
@@ -4770,8 +5720,8 @@ def read_AILFT_orca6(filename, conf, method='CASSCF', return_V=False, rotangle_V
             else:
                 matrix = rotate_V(matrix, 2, *rotangle_V)
 
-        if print_orcamatrix:
-            print(matrix)
+        if return_orcamatrix:
+            return matrix
 
         ### change to order  z2, yz, xz, xy, x2-y2 
         mask = [[(0,0), (2,0), (1,0), (4,0), (3,0)],
@@ -5069,13 +6019,9 @@ def from_Vint_to_Bkq_2(l, dic_, reverse=False):
         return dic_V
 
 
-def Rzyz_active(params):
+def Rzyz_active(alpha=0,beta=0,gamma=0):
     #proper-euler angles
     #active rotation
-    parvals = params.valuesdict()
-    alpha = parvals['alpha']
-    beta = parvals['beta']
-    gamma = parvals['gamma']
 
     ca = np.cos(alpha)
     cb = np.cos(beta)
