@@ -2045,7 +2045,7 @@ class Magnetics():
                 H = Hamiltonian([seni,Li,Si,senj,Lj,Sj,Ji,MJi,Jj,MJj], [labeli,labelj], self.calc.conf, self.calc.dic_cfp, self.calc.tables, self.calc.dic_LS, self.calc.dic_LS_almost)  #self.conf è quella del main
                 if Li==Lj and Si==Sj and seni==senj:
 
-                    kL, gS = H.Zeeman(k=k, eval=evaluation, MM=True)
+                    kL, gS = H.Zeeman(k=k, evaluation=evaluation, MM=True)
 
                     # x,y,z  -->  -1,0,+1
                     matrix[0,i,j] += (kL[0]+gS[0] - (kL[2]+gS[2]))*1/(np.sqrt(2))
@@ -2669,6 +2669,55 @@ def fig_susc_field(conf, dic_Bkq, temp=2., n_points=20, delta=0.01):
     plt.show()
 
     return magnitudes, points
+
+def fig_rep_magnfield(Mvec, xyz, data=None):
+
+    import matplotlib
+    import matplotlib.cm as cm
+
+    def cmap2list(cmap, N=10, start=0, end=1):
+        x = np.linspace(start, end, N)
+        colors = cmap(x)
+        return colors
+
+    ### plot magnetization surface
+    fig = plt.figure()
+    ax = fig.add_subplot(121, projection='3d', facecolor='white')
+    Mvec = np.reshape(Mvec,(len(Mvec),1))
+    data_p = np.hstack((Mvec,xyz))
+    data_p = data_p[data_p[:, 0].argsort()]
+    vectors = data_p[:,1:]
+    norm_or = data_p[:,0]
+    
+    colorlist = cmap2list(cm.coolwarm, N=vectors.shape[0])
+
+    ax.scatter(vectors[:,0],vectors[:,1],vectors[:,2], color=colorlist)
+
+    box = plt.axes([0.75, 0.3, 0.02, 0.45])
+    norm = matplotlib.colors.Normalize(norm_or[0],norm_or[-1])
+    plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.coolwarm), cax=box)
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+
+    if data is not None:
+        for i in range(data.shape[0]):
+            vector = data[i,1:-1]
+            ax.plot([0.,vector[0]],[0.,vector[1]],[0.,vector[2]],'--',lw=0.2,c='k')
+            if data[i,0] in nja.color_atoms().keys():
+                ax.scatter(vector[0],vector[1],vector[2],'o',c = nja.color_atoms()[data[i,0]],lw=3)
+            else:
+                ax.scatter(vector[0],vector[1],vector[2],'o',c = nja.color_atoms()['_'],lw=3)
+            ax.text(vector[0]+0.4*np.sign(vector[0]),vector[1]+0.4*np.sign(vector[1]),vector[2]+0.4*np.sign(vector[2]),data[i,-1], size=8)
+
+    ax.set_xlim(-4, 4)
+    ax.set_ylim(-4, 4)
+    ax.set_zlim(-4, 4)
+
+    # Remove the grid
+    ax.grid(False)
+
+    plt.show()
 
 def calc_segm(E_val, x=1, spanx=0.5):
     """ Costruisce il segmento (x-spanx/x, E_val), (x+spanx/2, E_val) """
