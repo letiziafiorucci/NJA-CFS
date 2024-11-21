@@ -1785,7 +1785,7 @@ def test_energy_allconf_d():
 
         print(conf)
 
-        E_fe, _ = read_out("test/f_electron/output_"+conf+".dat")
+        E_fe, _ = read_out("test/complete_matrices/output_"+conf+".dat")
         
         dic_Bkq = nja.calc_Bkq(data, conf, False, False)
         dic = nja.free_ion_param_AB(conf)
@@ -1794,7 +1794,7 @@ def test_energy_allconf_d():
         result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, wordy=False, ground_proj=True, save_matrix=True)
 
         # test over matrix elements
-        check = np.loadtxt("test/f_electron/"+conf+".txt")
+        check = np.loadtxt("test/complete_matrices/"+conf+".txt")
         matrix = np.load('matrix.npy', allow_pickle=True, fix_imports=False)
         count = 0
         for i in range(matrix.shape[0]):
@@ -1826,7 +1826,7 @@ def test_tables_d():
         result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, wordy=False, ground_proj=True, save_matrix=True)
 
         # test over matrix elements
-        check_R = np.loadtxt("test/f_electron/"+conf+".txt")
+        check_R = np.loadtxt("test/complete_matrices/"+conf+".txt")
         matrix = np.load('matrix.npy', allow_pickle=True, fix_imports=False)
         count = 0
         for i in range(matrix.shape[0]):
@@ -1852,8 +1852,8 @@ def test_energy_allconf_f():
         result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, wordy=False, ground_proj=True, save_matrix=True, save_label=True)
         label_matrix = np.loadtxt('matrix_label.txt')
         # test over matrix elements
-        check_R = np.loadtxt("test/f_electron/"+conf+"_R.txt")
-        check_I = np.loadtxt("test/f_electron/"+conf+"_I.txt")
+        check_R = np.loadtxt("test/complete_matrices/"+conf+"_R.txt")
+        check_I = np.loadtxt("test/complete_matrices/"+conf+"_I.txt")
         matrix = np.load('matrix.npy', allow_pickle=True, fix_imports=False)
         count = 0
         for i in range(matrix.shape[0]):
@@ -1924,8 +1924,8 @@ def test_tables_f():
         result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, wordy=False, ground_proj=True, save_matrix=True)
 
         # test over matrix elements
-        check_R = np.loadtxt("test/f_electron/"+conf+"_R.txt")
-        check_I = np.loadtxt("test/f_electron/"+conf+"_I.txt")
+        check_R = np.loadtxt("test/complete_matrices/"+conf+"_R.txt")
+        check_I = np.loadtxt("test/complete_matrices/"+conf+"_I.txt")
         matrix = np.load('matrix.npy', allow_pickle=True, fix_imports=False)
         count = 0
         for i in range(matrix.shape[0]):
