@@ -1992,7 +1992,7 @@ def calc_torque(B0, T, LF_matrix, basis, plane='xz', step=3.1415/40, figure=Fals
         for i in np.arange(0, 361, 45):
             ax1.axvline(i, color='gray', lw=0.5, alpha=0.5)
         
-        ax1.set_title('B direction: ' + str_ax + ', plane: ' + plane)
+        ax1.set_title('B direction: ' + plane[0] + ', torque component: ' + str_ax)
         plt.tight_layout()
         if isinstance(figure, str):
             plt.savefig(figure, dpi=600)
