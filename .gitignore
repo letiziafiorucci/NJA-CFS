@@ -1,1 +1,13 @@
 test/simpre/*
+test/complete_matrices/input*
+test/complete_matrices/output*
+BKQ.ods
+*.pdf
+*.png
+__pycache__/
+OctoYot/
+*.txt
+*.inp
+Other_scripts/
+*.npy
+B1F_ALL.TXT
