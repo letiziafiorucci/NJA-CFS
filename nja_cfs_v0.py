@@ -12,9 +12,9 @@ from datetime import datetime
 from pprint import pprint
 import copy
 import warnings
-import re
+import sympy
 
-__version__ = "0.1.2"
+__version__ = "0.1.4"
 
 def print_program_info():
     program_name = "NJA-CFS (Not Just Another - Crystal Field Software)"
@@ -742,402 +742,16 @@ class Hamiltonian():
         elif tables is not None and dic_cfp is None:
             self.TAB = True
             self.rme = tables
-
-    def electrostatic_int(self, basis, F0=0, F2=0, F4=0, F6=0, eval_bool=True, tab_ee=None):
-        #equations are taken from Boca 1999, "theoretical fundations of molecular magnetism" (Ch 8, p 518) (valid only for l2 conf)
-        #for the other configurations the equations are reported in Boca 2012 (p 145 eq 4.66-4.69)
-
-        def l_Ck_l1(l, k, l1):
-            return (-1)**l*np.sqrt((2*l+1)*(2*l1+1))*Wigner_coeff.threej_symbol([[l, k, l1],[0, 0, 0]])
-
-        def Vee(label1v, label1v1):
-
-            idxv = term_label.index(label1v)
-            Sv, Lv, vv = term_basis[idxv]
-            Sv /= 2
-            #print('\n',label1v, Sv, Lv, vv)
-
-            idxv1 = term_label.index(label1v1)
-            Sv1, Lv1, vv1 = term_basis[idxv1]
-            Sv1 /= 2
-            #print(label1v1, Sv1, Lv1, vv1)
-
-            ck_list = np.zeros(len(range(0,2*self.l+1,2)))
-            for i,k in enumerate(range(0,2*self.l+1,2)):
-                ck = 0
-                if k!=0:
-                    ck += 0.5*l_Ck_l1(self.l, k, self.l)**2
-                    somma = 0
-                    for ii, term in enumerate(term_basis):
-                        if self.TAB == False:
-
-                            label2 = term_label[ii]
-                            S1, L1, v1 = term_basis[ii]  #2S, L, v
-                            S1 /= 2
-
-                            if label2[0]==label1v[0]:
-                                #print(label2, label1v, label1v1)
-                                somma += self.rme.Uk(k, n=self.N, v=vv, L=Lv, S=Sv, v1=v1, L1=L1, S1=S1, label1=label1v, label2=label2)*self.rme.Uk(k, n=self.N, v=vv1, L=Lv1, S=Sv1, v1=v1, L1=L1, S1=S1, label1=label1v1, label2=label2)  #questi non sono quelli di closed shell
-                        else:
-
-                            label2 = term_label[ii]
-                            if label2[0]==label1v[0]:
-                                try:
-                                    somma += self.rme['U'+str(k)][label1v][label2]*self.rme['U'+str(k)][label1v1][label2]
-                                except:
-                                    somma += 0
-                                # print(somma)
-                    #exit()
-                    somma *= 1/(2*Lv+1)
-                    if self.v==self.v1:
-                        somma -= self.n/(2*self.l+1)
-                    ck *= somma
-                else:
-                    if self.v==self.v1:
-                        ck = self.n*(self.n-1)/2
-                if self.closed==True:
-                    #ck *= (-1)**((self.v1-self.v)/2.)
-                    if self.v==self.v1:
-                        ck -= (2*self.l+1-self.n)/(2*self.l+1)*l_Ck_l1(self.l, k, self.l)**2
-                else:
-                    pass
-                ck_list[i] = ck
-
-            return ck_list
-
-        #=======================================================================
-
-        if eval_bool==False:
-            F0, F2, F4, F6 = symbols("F0, F2, F4, F6")
-            coeff = [F0, F2, F4, F6]
-        else:
-            coeff = [F0, F2, F4, F6]
-
-        if tab_ee is not None:
-            # pprint(tab_ee)
-            coeff_ee = {}
-            for key1 in tab_ee.keys():
-                try:
-                    var = coeff_ee[key1]
-                except:
-                    coeff_ee[key1] = {}
-                for key2 in tab_ee[key1].keys():
-                    numero = tab_ee[key1][key2]
-
-                    if len(numero)!=1:
-                        try:
-                            numero = [numero[ii].replace(stringa,'') for ii,stringa in enumerate(['F0', 'F2', 'F4', 'F6'])]
-                        except:
-                            numero = [numero[ii].replace(stringa,'') for ii,stringa in enumerate(['F2', 'F4', 'F6'])]
-                    else:
-                        numero = 0
-                    
-                    if numero!=0:
-                        for ii in range(len(numero)):
-                            numero[ii]=numero[ii].replace('(', '*np.sqrt(')
-
-                            if '+/' in numero[ii] or '-/' in numero[ii]:
-                                numero[ii] = numero[ii].replace('+','+1')
-                                numero[ii] = numero[ii].replace('-','-1')
-
-                            numero[ii] = eval(numero[ii])
-
-                    if numero!=0:
-                        if len(numero)<4:
-                            while len(numero)<4:
-                                numero.insert(0,0)
-                    else:
-                        numero = [0,0,0,0]
-
-
-                    coeff_ee[key1].update({key2:numero})
-                    if key1!=key2:
-                        #print(key1,key2)
-                        try:
-                            #print(key2,key1)
-                            coeff_ee[key2].update({key1:numero})
-                        except:
-                            #print(key2,key1)
-                            coeff_ee[key2]={}
-                            coeff_ee[key2].update({key1:numero})
-        # pprint(coeff_ee)
-        # exit()
-
-        term_basis = np.array(terms_basis(self.conf[0]+str(self.n)))
-        term_label = terms_labels(self.conf[0]+str(self.n))
-        ck_coeff = np.zeros(len(range(0,2*self.l+1,2)))
-        for i, term in enumerate(term_basis):
-            if tab_ee is not None:
-                ck_coeff += np.array(coeff_ee[term_label[i]][term_label[i]])*(term[0]+1)*(2*term[1]+1)
-            else:
-                ck_coeff += np.array(Vee(term_label[i], term_label[i]), dtype='float64')*(term[0]+1)*(2*term[1]+1)
-            # for k in range(1,4):
-            #     vee = Vee(term_label[i], term_label[i])
-            #     print(k, term_label[i],f'{vee[1]:.18f}',f'{vee[2]:.18f}',f'{vee[3]:.18f}', ck_coeff[k])
-            #     print(k, term_label[i], ck_coeff[k])
-        ck_coeff /= basis.shape[0]
-
-        # exit()
-
-        integral = 0
-        label1v = self.label1
-        label1v1 = self.label2
-        if tab_ee is not None:
-            try:
-                ck = np.array(coeff_ee[label1v][label1v1])
-            except:
-                ck = np.zeros(4)
-        else:
-            ck = Vee(label1v, label1v1)
-        for i,_ in enumerate(range(0,2*self.l+1,2)):
-            if self.v==self.v1:
-                integral += (ck[i] - ck_coeff[i])*coeff[i]
-                #print(ck[i]-ck_coeff[i],ck[i],ck_coeff[i],coeff[i])
-                # print(f'{ck[i]-ck_coeff[i]:.18f}',f'{ck[i]:.18f}',f'{ck_coeff[i]:.18f}')
-            else:
-                integral += ck[i]*coeff[i]
-
-        # print(integral)
-        #
-        # print(label1v, label1v1, ck, coeff, ck - ck_coeff, integral)
-        # print(ck_coeff*basis.shape[0])
-        # exit()
-
-        # print(self.v, self.v1)
-        # print(integral, ck, coeff)
-        # exit()
-
-        return integral
     
-    def electrostatic_int_test(self, basis, F0=0, F2=0, F4=0, F6=0, eval_bool=True, tab_ee=None):
+    def electrostatic_int(self, basis, F0=0, F2=0, F4=0, F6=0, evaluation=True, tab_ee=None):
         #equations are taken from Boca 1999, "theoretical fundations of molecular magnetism" (Ch 8, p 518) (valid only for l2 conf)
-        #for the other configurations the equations are reported in Boca 2012 (p 145 eq 4.66-4.69)
-
-        def delta(a,b,c):
-            #is needed simply to compute the eigenvalues of a 2x2 matrix
-            return np.sqrt(4*c**2+(a-b)**2)
-        
-        def eig2x2(a,b,c):
-            l1 = (a+b-delta(a,b,c))/2
-            l2 = (a+b+delta(a,b,c))/2
-            return l1,l2
-
-        def omegaUL(U,L):
-            gU = {99:0,
-                10:6,
-                11:12,
-                20:14,
-                21:21,
-                30:24,
-                22:30,
-                31:32,
-                40:36}
-            return 1/2*state_legend(L)*(state_legend(L)+1) - gU[U]
-
-        S_list = [7/2, 3, 5/2, 5/2, 2, 2, 3/2, 3/2, 1, 1/2]
-        v_list = [7, 6, 5, 7, 4, 6, 5, 7, 6, 7]
-
-        #W, U, U1
-        x_g = {220:
-                {20:
-                {20:3/14, 21:3*np.sqrt(55)/7, 22:-3*np.sqrt(5/28)},
-                21:
-                {20:3*np.sqrt(55)/7, 21:[-6/7,-3], 22:3/np.sqrt(7)}},
-                22:
-                {20:-3*np.sqrt(5/28), 21:3/np.sqrt(7), 22:3/2},
-               221:
-                {10:
-                {30:5*np.sqrt(143), 31:-15*np.sqrt(429)},
-                11:
-                {21:14*np.sqrt(910/11), 30:2*np.sqrt(10), 31:2*np.sqrt(39)/11},
-                20:
-                {20:2/7, 21:-10*np.sqrt(6)/7, 30:np.sqrt(3), 31:9*np.sqrt(3/7)},
-                21:
-                {11:14*np.sqrt(910/11), 20:-10*np.sqrt(6)/7, 21:[-1/7,12/11], 30: 5*np.sqrt(2/11), 31:3*np.sqrt(2)/11},
-                30:
-                {10: 5*np.sqrt(143), 11:2*np.sqrt(10), 20: np.sqrt(3), 21:5*np.sqrt(2/11), 30:-1/2, 31:3/(2*np.sqrt(11))},
-                31:
-                {10:-15*np.sqrt(429), 11:2*np.sqrt(39)/11, 20:9*np.sqrt(3/7), 21:3*np.sqrt(2)/11, 30:3/(2*np.sqrt(11)), 31:1/22}},
-               222:
-                {99:
-                {40:-30*np.sqrt(143)},
-                10:
-                {30:-3*np.sqrt(1430), 40:9*np.sqrt(1430)},
-                20:
-                {20:6/11, 30:-3*np.sqrt(42/11), 40:9*np.sqrt(2)/11},
-                30:
-                {10:-3*np.sqrt(1430), 20:-3*np.sqrt(42/11), 30:-3, 40:1/np.sqrt(11)},
-                40:
-                {99:-30*np.sqrt(143), 10:9*np.sqrt(1430), 20:9*np.sqrt(2)/11, 30:1/np.sqrt(11), 40:3/11}}}
-        #U' L U
-        chi_L = {20:
-                {"D":{20:143},
-                "G":{20:-130},
-                "I":{20:35}},
-                21:
-                {"H":{11:1, 20:0, 21:[49,-75]},
-                "D":{20:-39*np.sqrt(2), 21:[377, 13]},
-                "F":{21:[455, -65]},
-                "G":{20:4*np.sqrt(65), 21:[-561, 55]},
-                "K":{21:[-315, 133]},
-                "L":{21:[245, -75]}},
-                30:
-                {"P":{11:-13*np.sqrt(11), 30:-52},
-                "F":{10:1, 21:12*np.sqrt(195), 30:38},
-                "G":{20:-13*np.sqrt(5), 21:8*np.sqrt(143), 30:-52},
-                "H":{11:np.sqrt(39), 21:11*np.sqrt(42), 30:88},
-                "I":{20:30, 30:25},
-                "K":{21:-4*np.sqrt(17), 30:-94},
-                "M":{30:25}},
-                22:
-                {"S":{22:260},
-                "D":{20:3*np.sqrt(429), 21:45*np.sqrt(78), 22:-25},
-                "G":{20:-38*np.sqrt(65), 21:12*np.sqrt(11), 22:94},
-                "H":{21:-12*np.sqrt(546), 22:104},
-                "I":{20:21*np.sqrt(85), 22:-181},
-                "L":{21:-8*np.sqrt(665), 22:-36},
-                "N":{22:40}},
-                31:
-                {"P":{11:11*np.sqrt(330), 30:76*np.sqrt(143), 31:-6644},
-                "D":{20:-8*np.sqrt(78), 21:-60*np.sqrt(39/7), 31:4792},
-                "F":{10:[0,1], 21:[-312*np.sqrt(5), 12*np.sqrt(715)], 30:[-48*np.sqrt(39), -98*np.sqrt(33)], 31:list(eig2x2(4420, -902, 336*np.sqrt(143)))},
-                "G":{20:5*np.sqrt(65), 21:2024/np.sqrt(7), 30:20*np.sqrt(1001), 31:-2684},
-                "H":{11:[11*np.sqrt(85), -25*np.sqrt(77)], 21:[31*np.sqrt(1309/3), 103*np.sqrt(5/3)], 30:[-20*np.sqrt(374), -44*np.sqrt(70)], 31:list(eig2x2(-2024,2680,-48*np.sqrt(6545)))},
-                "I":{20:[10*np.sqrt(21),0], 30:[-57*np.sqrt(33), 18*np.sqrt(1122)], 31:list(eig2x2(-12661/5,17336/5,-3366*np.sqrt(34)/5))},
-                "K":{21:[-52*np.sqrt(323/23), -336*np.sqrt(66/23)], 30:[-494*np.sqrt(19/23), 73*np.sqrt(1122/23)], 31:list(eig2x2(123506/23, -85096/23, 144*np.sqrt(21318)/23))},
-                "L":{21:-24*np.sqrt(190), 31:-4712},
-                "M":{30:-21*np.sqrt(385), 31:-473},
-                "N":{31:1672},
-                "O":{31:220}},
-                40:
-                {"S":{99:1, 40:-1408},
-                "D":{20:-88*np.sqrt(13), 40:-44},
-                "F":{10:1, 30:90*np.sqrt(11), 40:1078},
-                "G":{20:[53*np.sqrt(715/27), 7*np.sqrt(15470/27)], 30:[-16*np.sqrt(1001), 64*np.sqrt(442)], 40:list(eig2x2(-16720/9, 10942/9, -34*np.sqrt(2618)/9))},
-                "H":{30:-72*np.sqrt(462), 40:-704},
-                "I":{20:[34*np.sqrt(1045/31), -12*np.sqrt(1785/31)], 30:[-9*np.sqrt(21945/31), 756*np.sqrt(85/31)], 40:list(eig2x2(-2453/31, 36088/31, 60*np.sqrt(74613)/31))},
-                "K":{30:-84*np.sqrt(33), 40:-132},
-                "L":{40:list(eig2x2(-4268/31, 11770/31, 924*np.sqrt(1995)/31))},
-                "M":{30:-99*np.sqrt(15), 40:-1067},
-                "N":{40:528},
-                "Q":{40:22}}}
-        #U' L U
-        phi_L = {11:
-                {"P":{11:-11},
-                "H":{11:3}},
-                20:
-                {"D":{20:-11},
-                "G":{20:-4},
-                "I":{20:7}},
-                21:
-                {"D":{20:6*np.sqrt(2), 21:-57},
-                "F":{10:1, 21:63},
-                "G":{20:np.sqrt(65), 21:55},
-                "H":{21:-105},
-                "K":{21:-14},
-                "L":{21:42}},
-                30:
-                {"P":{11:np.sqrt(11), 30:83},
-                "F":{21:np.sqrt(195), 30:-72},
-                "G":{20:2*np.sqrt(5), 21:-np.sqrt(143), 30:20},
-                "H":{11:np.sqrt(39), 21:-2*np.sqrt(42), 30:-15},
-                "I":{20:3, 30:42},
-                "K":{21:-4*np.sqrt(17), 30:-28},
-                "M":{30:6}},
-                22:
-                {"S":{99:1, 22:144},
-                "D":{20:3*np.sqrt(429), 22:69},
-                "G":{20:4*np.sqrt(65), 22:-148},
-                "H":{22:72},
-                "I":{20:3*np.sqrt(85), 22:39},
-                "L":{22:-96},
-                "N":{22:56}},
-                31:
-                {"P":{11:np.sqrt(330), 30:17*np.sqrt(143), 31:209},
-                "D":{21:12*np.sqrt(273), 31:-200},
-                "F":{10:[1,0], 21:[-36*np.sqrt(5), -3*np.sqrt(715)], 30:[-16*np.sqrt(39), 24*np.sqrt(33)], 31:list(eig2x2(624, -616, -80*np.sqrt(143)))},
-                "G":{21:11*np.sqrt(7), 30:4*np.sqrt(1001), 31:836},
-                "H":{11:[np.sqrt(85), np.sqrt(77)], 21:[-2*np.sqrt(1309/3), -74*np.sqrt(5/3)], 30:[np.sqrt(187/2), 31*np.sqrt(35/2)], 31:list(eig2x2(-1353/2, 703/2, -5*np.sqrt(6545)/2))},
-                "I":{30:[30*np.sqrt(33), 0], 31:list(eig2x2(-2662/5, -88/5, 528*np.sqrt(34)/5))},
-                "K":{21:[-28*np.sqrt(323/23), 42*np.sqrt(66/23)], 30:[4*np.sqrt(437),0], 31:list(eig2x2(6652/23, -5456/23, 96*np.sqrt(21318)/23))},
-                "L":{21:-6*np.sqrt(190), 31:-464},
-                "M":{30:-6*np.sqrt(385), 31:814},
-                "N":{31:-616},
-                "O":{31:352}},
-                40:
-                {"S":{22:2*np.sqrt(2145)},
-                "D":{20:11*np.sqrt(13), 21:-6*np.sqrt(26), 22:9*np.sqrt(33)},
-                "F":{21:3*np.sqrt(455)},
-                "G":{20:[-4*np.sqrt(715/27),np.sqrt(15470/27)], 21:[-131*np.sqrt(11/27), 17*np.sqrt(238/27)], 22:[-4*np.sqrt(11/27), -17*np.sqrt(238/27)]},
-                "H":{21:-12*np.sqrt(21), 22:3*np.sqrt(286)},
-                "I":{20:[7*np.sqrt(1045/31),3*np.sqrt(1785/31)], 22:[3*np.sqrt(3553/31),75*np.sqrt(21/31)]},
-                "K":{21:-2*np.sqrt(119)},
-                "L":{21:[22*np.sqrt(105/31), -84*np.sqrt(19/31)], 22:[4*np.sqrt(627/31), 12*np.sqrt(385/31)]},
-                "N":{22:-np.sqrt(2530)}}}
-        #conf v:(2*S+1):U v1:(2*S1+1):U1
-        y_g = {"f3":
-                {"1:2:10":{"3:2:21":-6*np.sqrt(22)},
-                "3:2:11":{"3:2:11":2},
-                "3:2:20":{"3:2:20":10/7, "3:2:21":2*np.sqrt(66)/7},
-                "3:2:21":{"3:2:20":2*np.sqrt(66)/7, "3:2:21":2/7}},
-                "f4":
-                {"2:3:10":{"4:3:21":-12*np.sqrt(33/5)},
-                "2:3:11":{"4:3:11":6/5, "4:3:30":6},
-                "4:3:10":{"4:3:21":8*np.sqrt(11/15)},
-                "4:3:11":{"4:3:11":29/15,"4:3:30":-1/3},
-                "4:3:20":{"4:3:20":6/7, "4:3:21":-8*np.sqrt(11/147), "4:3:30":4/np.sqrt(3)},
-                "4:3:21":{"4:3:10":8*np.sqrt(11/15), "4:3:20":-8*np.sqrt(11/147), "4:3:21":-2/21, "4:3:30":-4/3},
-                "4:3:30":{"4:3:11":-1/3, "4:3:20":4/np.sqrt(3), "4:3:21":-4/3, "4:3:30":1/3},
-                "0:1:99":{"4:1:22":-12*np.sqrt(22)},
-                "2:1:20":{"4:1:20":3*np.sqrt(3/175), "4:1:21":-4*np.sqrt(33/35), "4:1:22":-np.sqrt(3/5)},
-                "4:1:20":{"4:1:20":221/140, "4:1:21":8*np.sqrt(11/245), "4:1:22":-np.sqrt(7/80)},
-                "4:1:21":{"4:1:20":8*np.sqrt(11/245), "4:1:21":2/7},
-                "4:1:22":{"4:1:20":-np.sqrt(7/80), "4:1:22":1/4}},
-                "f5":
-                {"3:4:10":{"5:4:21":9*np.sqrt(11)},
-                "3:4:20":{"5:4:20":3/np.sqrt(7), "5:4:21":np.sqrt(33/7), "5:4:30":-2*np.sqrt(21)},
-                "5:4:10":{"5:4:21":-np.sqrt(55/3)},
-                "5:4:11":{"5:4:11":-1/3, "5:4:30":-5/3},
-                "5:4:20":{"5:4:20":5/7, "5:4:21":5*np.sqrt(11/147), "5:4:30":2/np.sqrt(3)},
-                "5:4:21":{"5:4:10":-np.sqrt(55/3), "5:4:20":5*np.sqrt(11/147), "5:4:21":-4/21, "5:4:30":-2/3},
-                "5:4:30":{"5:4:11":-5/3, "5:4:20":2/np.sqrt(3), "5:4:21":-2/3, "5:4:30":-1/3},
-                "1:2:10":{"5:2:21":36/np.sqrt(5), "5:2:31":-36*np.sqrt(2)},
-                "3:2:11":{"5:2:11":3/np.sqrt(2), "5:2:30":3*np.sqrt(5)/2, "5:2:31":-np.sqrt(39/8)},
-                "3:2:20":{"5:2:20":3/7, "5:2:21":-11*np.sqrt(6)/7, "5:2:30":-4*np.sqrt(3)},
-                "3:2:21":{"5:2:10":3*np.sqrt(33/10), "5:2:20":-3*np.sqrt(33/98), "5:2:21":3/(7*np.sqrt(11)), "5:2:30":-3/(2*np.sqrt(2)), "5:2:31":3/(2*np.sqrt(22))},
-                "5:2:10":{"5:2:21":43/np.sqrt(30), "5:2:31":4*np.sqrt(3)},
-                "5:2:11":{"5:2:11":-5/6, "5:2:30":-5*np.sqrt(5/72), "5:2:31":-np.sqrt(13/48)},
-                "5:2:20":{"5:2:20":11/7, "5:2:21":-11/(7*np.sqrt(6)), "5:2:30":4/np.sqrt(3)},
-                "5:2:21":{"5:2:10":43/np.sqrt(30), "5:2:20":-11/(7*np.sqrt(6)), "5:2:21":25/231, "5:2:30":29/(6*np.sqrt(22)), "5:2:31":1/(22*np.sqrt(2))},
-                "5:2:30":{"5:2:11":-5*np.sqrt(5/72), "5:2:20":4/np.sqrt(3), "5:2:21":29/(6*np.sqrt(22)), "5:2:30":-1/12, "5:2:31":1/(4*np.sqrt(11))},
-                "5:2:31":{"5:2:10":4*np.sqrt(3), "5:2:11":-np.sqrt(13/48), "5:2:21":1/(22*np.sqrt(2)), "5:2:30":1/(4*np.sqrt(11)), "5:2:31":1/44}},
-                "f6":
-                {"4:5:10":{"6:5:21":-6*np.sqrt(11)},
-                "4:5:20":{"6:5:20":-2*np.sqrt(2/7), "6:5:21":2*np.sqrt(33/7)},
-                "2:3:10":{"6:3:21":-48*np.sqrt(2/5), "6:3:31":-36},
-                "2:3:11":{"6:3:11":np.sqrt(6/5), "6:3:30":np.sqrt(3), "6:3:31":3*np.sqrt(13/10)},
-                "4:3:10":{"6:3:21":46/np.sqrt(15), "6:3:31":-8*np.sqrt(6)},
-                "4:3:11":{"6:3:11":11/(3*np.sqrt(5)), "6:3:30":-19/(3*np.sqrt(2)), "6:3:31":np.sqrt(13/60)},
-                "4:3:20":{"6:3:20":-6*np.sqrt(2)/7, "6:3:21":-22/(7*np.sqrt(3)), "6:3:30":8*np.sqrt(2/3)},
-                "4:3:21":{"6:3:10":-np.sqrt(110/3), "6:3:20":np.sqrt(22/147), "6:3:21":-16/(21*np.sqrt(11)), "6:3:30":5/(3*np.sqrt(2)), "6:3:31":1/np.sqrt(22)},
-                "4:3:30":{"6:3:11":-np.sqrt(5)/3, "6:3:20":4*np.sqrt(2/3), "6:3:21":4/(3*np.sqrt(11)), "6:3:30":1/(3*np.sqrt(2)), "6:3:31":-1/np.sqrt(22)},
-                "2:1:20":{"6:1:20":6/np.sqrt(55), "6:1:30":2*np.sqrt(42/5), "6:1:40":6*np.sqrt(2/55)},
-                "4:1:20":{"6:1:20":-61/np.sqrt(770), "6:1:30":8*np.sqrt(3/5), "6:1:40":-6/np.sqrt(385)},
-                "4:1:21":{"6:1:10":3*np.sqrt(22), "6:1:20":np.sqrt(2/7), "6:1:30":-np.sqrt(3), "6:1:40":1/np.sqrt(7)},
-                "4:1:22":{"6:1:99":-4*np.sqrt(33/5), "6:1:20":-1/np.sqrt(22), "6:1:40":2/np.sqrt(11)}},
-                "f7":
-                {"3:4:99":{"7:4:22":-12*np.sqrt(11)},
-                "3:4:10":{"7:4:21":6*np.sqrt(33)},
-                "3:4:20":{"7:4:20":-np.sqrt(5/7), "7:4:21":2*np.sqrt(11/7), "7:4:22":-1},
-                "3:2:11":{"7:2:30":2*np.sqrt(10)},
-                "3:2:20":{"7:2:20":-16/np.sqrt(77), "7:2:30":-2*np.sqrt(6), "7:2:40":6*np.sqrt(2/77)},
-                "3:2:21":{"7:2:10":-np.sqrt(66), "7:2:20":np.sqrt(6/7), "7:2:30":1, "7:2:40":np.sqrt(3/7)}}}
-
+        #for the d^n, f^1 and f^2 configurations the equations are reported in Boca 2012 (p 145 eq 4.66-4.69)
 
         def l_Ck_l1(l, k, l1):
             return (-1)**l*np.sqrt((2*l+1)*(2*l1+1))*Wigner_coeff.threej_symbol([[l, k, l1],[0, 0, 0]])
 
         def Vee(label1v, label1v1):
+            #works only for d^n, f^1 and f^2
 
             idxv = term_label.index(label1v)
             Sv, Lv, vv = term_basis[idxv]
@@ -1161,7 +775,7 @@ class Hamiltonian():
                             S1 /= 2
 
                             if label2[0]==label1v[0]:
-                                somma += self.rme.Uk(k, n=self.N, v=vv, L=Lv, S=Sv, v1=v1, L1=L1, S1=S1, label1=label1v, label2=label2)*self.rme.Uk(k, n=self.N, v=vv1, L=Lv1, S=Sv1, v1=v1, L1=L1, S1=S1, label1=label1v1, label2=label2)  #questi non sono quelli di closed shell
+                                somma += self.rme.Uk(k, n=self.N, v=vv, L=Lv, S=Sv, v1=v1, L1=L1, S1=S1, label1=label1v, label2=label2)*self.rme.Uk(k, n=self.N, v=vv1, L=Lv1, S=Sv1, v1=v1, L1=L1, S1=S1, label1=label1v1, label2=label2)  
                         else:
 
                             label2 = term_label[ii]
@@ -1170,8 +784,6 @@ class Hamiltonian():
                                     somma += self.rme['U'+str(k)][label1v][label2]*self.rme['U'+str(k)][label1v1][label2]
                                 except:
                                     somma += 0
-                                # print(somma)
-                    #exit()
                     somma *= 1/(2*Lv+1)
                     if self.v==self.v1:
                         somma -= self.n/(2*self.l+1)
@@ -1180,7 +792,6 @@ class Hamiltonian():
                     if self.v==self.v1:
                         ck = self.n*(self.n-1)/2
                 if self.closed==True:
-                    #ck *= (-1)**((self.v1-self.v)/2.)
                     if self.v==self.v1:
                         ck -= (2*self.l+1-self.n)/(2*self.l+1)*l_Ck_l1(self.l, k, self.l)**2
                 else:
@@ -1188,145 +799,28 @@ class Hamiltonian():
                 ck_list[i] = ck
 
             return ck_list
-
-        def calc_ek(conf, label1, label2, S, L, dic_ek): 
-            #dic_ek [n:v:U:2S+1:L][n:v1:U1:2S+1:L] 
-            v,W,U = terms_labels_symm(self.conf)[label1]
-            v1,W1,U1 = terms_labels_symm(self.conf)[label2]
-            ek_coeff = np.zeros(4)
-            n = int(conf[1:])
-            ek_coeff[0] = n*(n-1)/2   
-            if v==v1:
-                ek_coeff[1] = 9*(n - v)/2 + 1/4*v*(v+2) - S*(S+1)
-                if v!=2*S and W==W1 and int(str(W)[0])==2:
-                    factor1 = x_g[W][U][U1]
-                    factor2 = chi_L[U1][L][U]
-                    if isinstance(factor1, float):
-                        ek_coeff[2] = factor1*factor2
-                    else:
-                        ek_coeff[2] = np.sum(np.array(factor1)*np.array(factor2))
-                    if S in S_list and v in v_list:
-                        ek_coeff[2] *= -1
-                if v==2*S+1+1:
-                    ek_coeff[3] = -3*omegaUL(U,L)
-                if v==n and (v==6 or v==7):
-                    ek_coeff[3] = 0
-                key1 = ':'.join([str(v),str(v),str(U),str(2*S+1),L])
-                key2 = ':'.join([str(v),str(v),str(U1),str(2*S+1),L])
-                if key1 in dic_ek.keys():
-                    if key2 in dic_ek[key1].keys():
-                        if n==v+2:
-                            ek_coeff[3] = dic_ek[key1][key2]*(1-v)/(7-v)
-                        elif n==v+4:
-                            ek_coeff[3] = dic_ek[key1][key2]*(-4)/(7-v)
-            else:
-                if n==5 and v==1 and v1==3 and (2*S+1)==2:
-                    key1 = ':'.join(['3',str(v),str(U),str(2*S+1),L])
-                    key2 = ':'.join(['3',str(v1),str(U1),str(2*S+1),L])
-                    if key1 in dic_ek.keys():
-                        if key2 in dic_ek[key1].keys():
-                            ek_coeff[3] = dic_ek[key1][key2]*np.sqrt(2/5)
-                if n==6 and v==0 and v1==4 and (2*S+1)==1:
-                    key1 = ':'.join(['4',str(v),str(U),str(2*S+1),L])
-                    key2 = ':'.join(['4',str(v1),str(U1),str(2*S+1),L])
-                    if key1 in dic_ek.keys():
-                        if key2 in dic_ek[key1].keys():
-                            ek_coeff[3] = dic_ek[key1][key2]*np.sqrt(9/5)
-                if n==6 and v==2 and v1==4:
-                    key1 = ':'.join(['4',str(v),str(U),str(2*S+1),L])
-                    key2 = ':'.join(['4',str(v1),str(U1),str(2*S+1),L])
-                    if key1 in dic_ek.keys():
-                        if key2 in dic_ek[key1].keys():
-                            ek_coeff[3] = dic_ek[key1][key2]*np.sqrt(1/6)
-                if n==7 and v==1 and v1==5 and (2*S+1)==2:
-                    key1 = ':'.join(['5',str(v),str(U),str(2*S+1),L])
-                    key2 = ':'.join(['5',str(v1),str(U1),str(2*S+1),L])
-                    if key1 in dic_ek.keys():
-                        if key2 in dic_ek[key1].keys():
-                            ek_coeff[3] = dic_ek[key1][key2]*np.sqrt(3/2)
-
-            key1 = ':'.join([str(v),str(2*S+1),str(U)])
-            key2 = ':'.join([str(v1),str(2*S+1),str(U1)])
-            if key1 in y_g[conf]:
-                if key2 in y_g[conf][key1]:
-                    ek_coeff[3] = y_g[conf][key1][key2]*phi_L[U1][L][U]
-
-            key1 = ':'.join([str(n),str(v),str(U),str(2*S+1),L])
-            key2 = ':'.join([str(n),str(v1),str(U1),str(2*S+1),L])
-            if key1 not in dic_ek.keys():
-                dic_ek[key1] = {}
-            else:
-                if key2 not in dic_ek[key1].keys():
-                    dic_ek[key1][key2] = ek_coeff
-            return dic_ek
-
-                    
+           
         #=======================================================================
 
-        if eval_bool==False:
-            F0, F2, F4, F6 = symbols("F0, F2, F4, F6")
+        if evaluation==False:
+            F0, F2, F4, F6 = sympy.symbols("F0, F2, F4, F6")
             coeff = [F0, F2, F4, F6]
         else:
             coeff = [F0, F2, F4, F6]
 
         if tab_ee is not None:
-            # pprint(tab_ee)
-            coeff_ee = {}
-            for key1 in tab_ee.keys():
-                try:
-                    var = coeff_ee[key1]
-                except:
-                    coeff_ee[key1] = {}
-                for key2 in tab_ee[key1].keys():
-                    numero = tab_ee[key1][key2]
-
-                    if len(numero)!=1:
-                        try:
-                            numero = [numero[ii].replace(stringa,'') for ii,stringa in enumerate(['F0', 'F2', 'F4', 'F6'])]
-                        except:
-                            numero = [numero[ii].replace(stringa,'') for ii,stringa in enumerate(['F2', 'F4', 'F6'])]
-                    else:
-                        numero = 0
-                    
-                    if numero!=0:
-                        for ii in range(len(numero)):
-                            numero[ii]=numero[ii].replace('(', '*np.sqrt(')
-
-                            if '+/' in numero[ii] or '-/' in numero[ii]:
-                                numero[ii] = numero[ii].replace('+','+1')
-                                numero[ii] = numero[ii].replace('-','-1')
-
-                            numero[ii] = eval(numero[ii])
-
-                    if numero!=0:
-                        if len(numero)<4:
-                            while len(numero)<4:
-                                numero.insert(0,0)
-                    else:
-                        numero = [0,0,0,0]
-
-
-                    coeff_ee[key1].update({key2:numero})
-                    if key1!=key2:
-                        try:
-                            coeff_ee[key2].update({key1:numero})
-                        except:
-                            coeff_ee[key2]={}
-                            coeff_ee[key2].update({key1:numero})
+            coeff_ee = tab_ee.copy()
 
         term_basis = np.array(terms_basis(self.conf[0]+str(self.n)))
         term_label = terms_labels(self.conf[0]+str(self.n))
         ck_coeff = np.zeros(len(range(0,2*self.l+1,2)))
-        ck_coeff_back = np.zeros(len(range(0,2*self.l+1,2)))
         for i, term in enumerate(term_basis):
             if tab_ee is not None:
-                ck_coeff += np.array(coeff_ee[term_label[i]][term_label[i]])*(term[0]+1)*(2*term[1]+1)
-                ck_coeff_back += np.array(coeff_ee[term_label[i]][term_label[i]])*(term[0]+1)*(2*term[1]+1)
+                ck_coeff += coeff_ee[term_label[i]][term_label[i]]*(term[0]+1)*(2*term[1]+1)
             else:
                 ck_coeff += np.array(Vee(term_label[i], term_label[i]), dtype='float64')*(term[0]+1)*(2*term[1]+1)
 
         ck_coeff /= basis.shape[0]
-        ck_coeff_back /= basis.shape[0]
 
         integral = 0
         label1v = self.label1
@@ -1338,38 +832,19 @@ class Hamiltonian():
                 ck = np.zeros(4)
         else:
             ck = Vee(label1v, label1v1)
-
-        print(label1v, label1v1)
-        print(terms_labels_symm(self.conf)[label1v])
-
-        Ek_coeff = np.zeros(4)
-        Ek_coeff[0] = coeff[0] - 10/225*coeff[1] - 33/1089*coeff[2] - 286*25/184041*coeff[3]
-        Ek_coeff[1] = 1/9*(70/225*coeff[1] + 231/1089*coeff[2] + 2002*25/184041*coeff[3])
-        Ek_coeff[2] = 1/9*(1/225*coeff[1] - 3/1089*coeff[2] + 7*25/184041*coeff[3])
-        Ek_coeff[3] = 1/3*(5/225*coeff[1] + 6/1089*coeff[2] - 91*25/184041*coeff[3])
-
         for i,_ in enumerate(range(0,2*self.l+1,2)):
             if self.v==self.v1:
                 integral += (ck[i] - ck_coeff[i])*coeff[i]
-
             else:
                 integral += ck[i]*coeff[i]
-
-        print(self.v, self.v1)
-        print(integral, ck, coeff)
-        print(np.sum(ek_coeff*Ek_coeff), ek_coeff, Ek_coeff)
-        if self.v!=self.v1:
-            exit()
         
-
         return integral
 
-    def SO_coupling(self, zeta, k=1, eval=True):
-        #eq from SI of BonnMag
-        #or Konig & Kremer (Ch 2, p 11, eq 2.82)
+    def SO_coupling(self, zeta, k=1, evaluation=True):
+        #eq Konig & Kremer (Ch 2, p 11, eq 2.82)
 
-        if eval==False:
-            zeta, k = symbols("zeta, k")
+        if evaluation==False:
+            zeta, k = sympy.symbols("zeta, k")
         else:
             pass
 
@@ -1377,7 +852,6 @@ class Hamiltonian():
         coeff = Wigner_coeff.sixj_symbol([[self.L, self.L1,1],[self.S1,self.S, self.J]])
         if self.TAB == False:
             rme_V1k = self.rme.V1k()
-            #print('V1k',rme_V1k,self.termn2,self.termn1 )
         else:
             try:
                 rme_V1k = self.rme['V11'][self.label1][self.label2]
@@ -1386,16 +860,13 @@ class Hamiltonian():
 
         return pref*coeff*rme_V1k
 
-    def LF_contribution(self, dic_kq, eval=True):
+    def LF_contribution(self, dic_kq, evaluation=True):
         # taken from C. Goerller-Walrand, K. Binnemans, Handbook of Physics & Chemistry of Rare Earths, Vol 23, Ch 155, (1996)
 
-        if eval==False:
+        if evaluation==False:
             for k in range(2,2*self.l+1,2):
                 for q in range(-k,k+1,1):
-                    if f'{k}' in dic_kq.keys() and f'{q}' in dic_kq[f'{k}'].keys():
-                        dic_kq[f'{k}'][f'{q}'] = symbols(f"B{k}{q}")
-                    else:
-                        dic_kq[f'{k}'][f'{q}'] = 0.0
+                    dic_kq[f'{k}'][f'{q}'] = sympy.Symbol(f"B{k}{q}")
 
         else:
             for k in range(2,2*self.l+1,2):
@@ -1418,28 +889,31 @@ class Hamiltonian():
            
             coeff2 = Wigner_coeff.sixj_symbol([[self.J, self.J1, k],[self.L1, self.L, self.S]])
            
-            int = 0
+            integral = 0
             for q in range(0,k+1):
                 if q==0:
                     coeff0 = Wigner_coeff.threej_symbol([[self.J, k, self.J1],[-self.M,0,self.M1]])
                     Yk0 = (-1)**(2*self.J + self.L1 + self.S - self.M + k)*np.sqrt((2*self.J+1)*(2*self.J1+1))*ckk*coeff0*coeff2*Uk
-                    int += dic_kq[f'{k}'][f'{0}']*Yk0
+                    integral += dic_kq[f'{k}'][f'{0}']*Yk0
                 else:
                     coeffp = Wigner_coeff.threej_symbol([[self.J, k, self.J1],[-self.M,q,self.M1]])
                     coeffm = Wigner_coeff.threej_symbol([[self.J, k, self.J1],[-self.M,-q,self.M1]])
                     Ckqp = (-1)**(2*self.J + self.L1 + self.S - self.M + k)*np.sqrt((2*self.J+1)*(2*self.J1+1))*ckk*coeffp*coeff2*Uk
                     Ckqm = (-1)**(2*self.J + self.L1 + self.S - self.M + k)*np.sqrt((2*self.J+1)*(2*self.J1+1))*ckk*coeffm*coeff2*Uk
-                    int += dic_kq[f'{k}'][f'{q}']*(Ckqm+(-1)**q*Ckqp) + 1j*dic_kq[f'{k}'][f'{-q}']*(Ckqm - (-1)**q*Ckqp)
+                    if eval:
+                        integral += dic_kq[f'{k}'][f'{q}']*(Ckqm+(-1)**q*Ckqp) + 1j*dic_kq[f'{k}'][f'{-q}']*(Ckqm - (-1)**q*Ckqp)
+                    else:
+                        integral += dic_kq[f'{k}'][f'{q}']*(Ckqm+(-1)**q*Ckqp) + sympy.I*dic_kq[f'{k}'][f'{-q}']*(Ckqm - (-1)**q*Ckqp)
 
-            result += int
+            result += integral
 
         return result
 
-    def Zeeman(self, field=np.array([0.,0.,0.]), k=1, eval=True, MM=False, print_out=False):
+    def Zeeman(self, field=np.array([0.,0.,0.]), k=1, evaluation=True, MM=False, print_out=False):
         # eq from Boca 2012 p 588
 
-        if eval ==False:
-            Bx, By, Bz = symbols("Bx, By, Bz")
+        if evaluation ==False:
+            Bx, By, Bz = sympy.symbols("Bx, By, Bz")
         else:
             Bx, By, Bz = np.array(field)
 
@@ -1714,14 +1188,13 @@ class calculation():
                     dic_LS_almost = Full_basis(conf[0]+str(self.n+1))[1]   #, self.n+1)[1]  #questa è la dic_LS della configurazione corrispondente per i cfp
                 else:
                     dic_LS_almost = None
-                dic_ee = None
             else:
                 dic_cfp = None
                 tables = read_matrix_from_file(self.conf, self.closed)
                 dic_LS_almost = None
-                dic_ee = None
-                if self.l==3 and self.n>2:
-                    dic_ee = read_ee_int(self.conf, self.closed)
+            dic_ee = None
+            if self.l==3 and self.n>2:
+                dic_ee = read_ee_int(self.conf, self.closed)
 
         return dic_cfp, tables, dic_LS_almost, dic_ee
 
@@ -1862,10 +1335,8 @@ class calculation():
 
         print('Calculation on reduced set\nBasis set reduced to: '+str(self.basis.shape[0])+'\n' if wordy else "", end = "")
 
-        
-    #@njit
     #@cron
-    def MatrixH(self, elem, F0=0, F2=0, F4=0, F6=0, zeta=0, k=1, dic_V=None, dic_bkq = None,dic_AOM = None, PCM = None, field = [0.,0.,0.], cfp_angles = None, evaluation=True,wordy=False,
+    def MatrixH(self, elem, F0=0, F2=0, F4=0, F6=0, zeta=0, k=1, dic_V=None, dic_bkq = None,dic_AOM = None, PCM = None, field = [0.,0.,0.], cfp_angles = None,wordy=False,
                       Orth=False, Norm=False, eig_opt=False, ground_proj=False, return_proj=False, save_label=False, save_LF=False, save_matrix=False):
         #PCM is the old Stev
 
@@ -1884,8 +1355,6 @@ class calculation():
                 dic_V = from_AOM_to_Vint(dic_AOM, self.conf)
                 dic_bkq = from_Vint_to_Bkq(dic_V, self.conf)
             elif dic_bkq is None and dic_V is None and dic_AOM is None and PCM is not None:
-                # dic_Aqkrk = calc_Aqkrk(Stev[0], self.conf, Stev[1], Stev[2]) # first is the data, the second is the sph_flag, the third are the Sternheimer shielding parameters
-                # dic_bkq = from_Aqkrk_to_Bkq(dic_Aqkrk)
                 dic_bkq = calc_Bkq(PCM[0], self.conf, PCM[1], PCM[2])
             else:
                 print('ERROR: BKQ dict is missing in MatrixH')
@@ -1901,11 +1370,8 @@ class calculation():
         else:
             pass
 
-        self.par_dict = {'F0':F0, 'F2':F2, 'F4':F4, 'F6':F6, 'zeta':zeta, 'k':k, 'dic_bkq':dic_bkq, 'field':field}  # it's for the magnetic properties calculation
-        matrix = self.build_matrix(elem, F0, F2, F4, F6, zeta, k, dic_bkq, field, evaluation, save_label, save_LF, save_matrix)
-        # matrix = np.conj(matrix)  #se metto questo add_Zeeman va cambiato
-        # print(matrix)
-        # exit()
+        self.par_dict = {'F0':F0, 'F2':F2, 'F4':F4, 'F6':F6, 'zeta':zeta, 'k':k, 'dic_bkq':dic_bkq, 'field':field} 
+        matrix = self.build_matrix(elem, F0, F2, F4, F6, zeta, k, dic_bkq, field, save_label, save_LF, save_matrix)
 
         w,v = diagonalisation(matrix)
         v = np.round(v, 16)  #numbers are saved as complex128 data type
@@ -1934,7 +1400,7 @@ class calculation():
             if self.ground==True:
                 projected = projection_basis(result[1:,:], self.basis_l_JM, J_label=True)
                 if wordy:
-                    pprint(projected[1])  #il primo stato si chiama 1
+                    pprint(projected[1])  
             else:
                 projected = projection_basis(result[1:,:], self.basis_l, J_label=True), projection_basis(result[1:,:], self.basis_l_JM, J_label=True)
                 if wordy:
@@ -1966,7 +1432,7 @@ class calculation():
             return result
 
     # @cron
-    def build_matrix(self, elem, F0=0, F2=0, F4=0, F6=0, zeta=0, k=1, dic_bkq = None, field = [0.,0.,0.], evaluation=True, save_label=False, save_LF=False, save_matrix=False):
+    def build_matrix(self, elem, F0=0, F2=0, F4=0, F6=0, zeta=0, k=1, dic_bkq = None, field = [0.,0.,0.], save_label=False, save_LF=False, save_matrix=False):
 
         F = F0, F2, F4, F6
 
@@ -2011,9 +1477,9 @@ class calculation():
                     if Ji==Jj and MJi==MJj:
                         if Li == Lj and Si == Sj:
                             if self.l==3:
-                                Hee = H.electrostatic_int(basis, *F, eval_bool=evaluation, tab_ee = self.dic_ee)
+                                Hee = H.electrostatic_int(basis, *F, tab_ee = self.dic_ee)
                             else:
-                                Hee = H.electrostatic_int(basis, *F, eval_bool=evaluation)
+                                Hee = H.electrostatic_int(basis, *F)
                             matrix[i,j] += Hee
                             if save_LF:
                                 LF_matrixs[i,j] += Hee
@@ -2024,7 +1490,7 @@ class calculation():
 
                 if 'Hso' in elem:
                     if Ji==Jj and MJi==MJj:
-                        Hso = fac*H.SO_coupling(zeta, k, eval=evaluation)
+                        Hso = fac*H.SO_coupling(zeta, k)
                         matrix[i,j] += Hso
                         if save_LF:
                             LF_matrixs[i,j] += Hso
@@ -2035,7 +1501,7 @@ class calculation():
 
                 if 'Hcf' in elem:
                     if Si==Sj:
-                        Hcf = fac*H.LF_contribution(dic_bkq, eval=evaluation)
+                        Hcf = fac*H.LF_contribution(dic_bkq)
                         matrix[i,j] += Hcf
                         if save_LF:
                             LF_matrixs[i,j] += Hcf
@@ -2046,15 +1512,13 @@ class calculation():
 
                 if 'Hz' in elem:
                     if Li==Lj and Si==Sj and seni==senj:
-                        Hz = H.Zeeman(field, k, eval=evaluation)
+                        Hz = H.Zeeman(field, k)
                         matrix[i,j] += Hz
                         if i != j:
                             matrix[j,i] += np.conj(Hz)
 
                 else:
                     pass
-                
-                #print(matrix[i,j].real)
 
         if save_label:
             np.savetxt('matrix_label.txt', np.array(label_matrix))
@@ -2067,8 +1531,6 @@ class calculation():
 
 
 #======================= NEW FUNCTIONS for MAGNETIC PROPERTIES ==============================
-
-from itertools import product, permutations
 
 def fact(number):
     number = int(number)
@@ -2282,7 +1744,6 @@ def mag_moment(basis):
 def norm(tensor):
     return np.sqrt(np.sum(np.abs(tensor)**2))
 
-
 def dfridr(func, x, h, idxi, shape, fargs):
 
     # print(idxi)
@@ -2427,6 +1888,118 @@ def susceptibility_B_ord1(fields, temp, basis, LF_matrix, delta=0.001):
 
     return (chi_tensor, err_tensor)
 
+def effGval(levels, mu_matrix, v_matrix): 
+    #v_matrix = result[1:,:]
+
+    levels = np.array(levels)  
+                                                            
+    gexs = np.zeros(10, dtype='int32')
+    ngexs = int((levels[1]-levels[0]+1)/2)
+
+    for i in range(ngexs):
+        gexs[2*i]=int(levels[0])+2*i-1
+        gexs[2*i+1]=int(levels[0])+2*i
+
+    G2 = np.zeros((3,3), dtype='complex128')
+    for i in range(ngexs):
+        j = gexs[2*i]
+        idx1 = [j,j,j+1,j+1]
+        idx2 = [j,j+1,j,j+1]
+        gk = np.zeros((3,4,4), dtype='complex128')
+        for ii in idx1:
+            for jj in idx2:
+                for kk in range(3):
+                    gk[kk,ii,jj] = np.dot(np.conj(v_matrix[:,ii]).T, np.dot(mu_matrix[kk,...],v_matrix[:,jj]))
+
+        gx11 = gk[0,j,j]; gx12 = gk[0,j,j+1]; gx21 = gk[0,j+1,j]; gx22 = gk[0,j+1,j+1];
+        gy11 = gk[1,j,j]; gy12 = gk[1,j,j+1]; gy21 = gk[1,j+1,j]; gy22 = gk[1,j+1,j+1];
+        gz11 = gk[2,j,j]; gz12 = gk[2,j,j+1]; gz21 = gk[2,j+1,j]; gz22 = gk[2,j+1,j+1];
+
+        G2[0,0]=gx11*gx11 + gx12*gx21 + gx21*gx12 + gx22*gx22
+        G2[0,1]=gx11*gy11 + gx12*gy21 + gx21*gy12 + gx22*gy22
+        G2[1,0]=G2[0,1]
+        G2[0,2]=gx11*gz11 + gx12*gz21 + gx21*gz12 + gx22*gz22
+        G2[2,0]=G2[0,2]
+        G2[1,1]=gy11*gy11 + gy12*gy21 + gy21*gy12 + gy22*gy22
+        G2[1,2]=gy11*gz11 + gy12*gz21 + gy21*gz12 + gy22*gz22
+        G2[2,1]=G2[1,2]
+        G2[2,2]=gz11*gz11 + gz12*gz21 + gz21*gz12 + gz22*gz22
+
+    w,v = np.linalg.eigh(G2)
+
+    return np.sqrt(2*w),v
+
+def calc_torque(B0, T, LF_matrix, basis, plane='xz', step=3.1415/40, figure=False, show_fig=False):
+
+    NA = 6.022e23
+    muB = 0.4668517532494337
+    Jconv = 1.9865e-23
+
+    def missing_axis(plane_label):
+
+        axes = ['x', 'y', 'z']
+        
+        missing_axis_label = next(axis for axis in axes if axis not in plane_label)
+        missing_axis_index = axes.index(missing_axis_label)
+        B_direction = axes.index(plane_label[0])
+        
+        return missing_axis_label, missing_axis_index, B_direction
+
+    angles = np.arange(0, 2 * np.pi + np.pi/180, step)
+    tau_vecs = []
+    mu_matrix = mag_moment(basis)
+
+    str_ax, idx_ax, idx_B = missing_axis(plane)
+    vec_field = np.array([0.0, 0.0, 0.0])
+
+    # Calculate tau_vec for each B0
+    for idx in range(len(B0)):
+        vec_field[idx_B] = B0[idx]
+        tau_vec = np.zeros((len(angles), 3))
+        for i in range(len(angles)):
+            rot_vec = rotate_vectors(vec_field, angles[i], str_ax)
+            M = M_vector(rot_vec, mu_matrix, LF_matrix, basis, T)
+            tau_vec[i, :] = np.cross(M, rot_vec)*NA*muB*Jconv
+        tau_vecs.append(tau_vec[:, idx_ax])
+    
+    if figure:
+        fig, ax1 = plt.subplots()
+        fig.set_size_inches(7, 4)
+        
+        line1, = ax1.plot(angles * 180 / np.pi, tau_vecs[0], 'b-', label=f'{B0[0]} T')
+        ax1.set_xlabel('Angle / degrees')
+        ax1.set_ylabel(r'$\tau$ / Nm/mol', color='b')
+        ax1.tick_params(axis='y', labelcolor='b')
+        
+        axes = [ax1]
+        lines = [line1]
+        colors = ['r', 'g', 'c', 'm', 'y', 'k']
+        for idx in range(1, len(B0)):
+            ax = ax1.twinx()
+            ax.spines['right'].set_position(('outward', 60 * (idx - 1)))  # Adjust the position
+            line, = ax.plot(angles * 180 / np.pi, tau_vecs[idx], color=colors[idx % len(colors)], label=f'{B0[idx]} T')
+            ax.set_ylabel(r'$\tau$ / Nm/mol', color=colors[idx % len(colors)])
+            ax.tick_params(axis='y', labelcolor=colors[idx % len(colors)])
+            axes.append(ax)
+            lines.append(line)
+        
+        labs = [l.get_label() for l in lines]
+        ax1.legend(lines, labs, loc='upper right')
+        
+        ax1.axhline(0, color='black', lw=0.5)
+        ax1.set_xlim(0, 360)
+        ax1.set_xticks(np.arange(0, 361, 45))
+        for i in np.arange(0, 361, 45):
+            ax1.axvline(i, color='gray', lw=0.5, alpha=0.5)
+        
+        ax1.set_title('B direction: ' + str_ax + ', plane: ' + plane)
+        plt.tight_layout()
+        if isinstance(figure, str):
+            plt.savefig(figure, dpi=600)
+        if show_fig:
+            plt.show()
+
+    return angles, np.array(tau_vecs)
 
 #======================= MAGNETIC PROPERTIES ==============================
 
@@ -2434,7 +2007,7 @@ class Magnetics():
 
     def __init__(self, calc, contributes, par):
 
-        calc.MatrixH(contributes, **par)
+        self.result = calc.MatrixH(contributes, **par)
         self.par_dict = calc.par_dict
 
         self.calc = calc
@@ -2445,13 +2018,14 @@ class Magnetics():
         self.mu0 = scipy.constants.mu_0
         self.muB = scipy.constants.physical_constants['Bohr magneton'][0]/1.9865e-23
 
-        #print('\nMAGNETIC PROPERTIES CALCULATION\n')
-
     def mag_moment(self, k=1, evaluation=True):
         #costruction of magnetic moment matrix as kL+geS
         #y component is divided by i (imaginary unit)
 
-        matrix = np.zeros((3, self.basis.shape[0],self.basis.shape[0]),dtype='complex128')
+        if not evaluation:
+            matrix = np.zeros((3, self.basis.shape[0],self.basis.shape[0]),dtype=object)
+        else:
+            matrix = np.zeros((3, self.basis.shape[0],self.basis.shape[0]),dtype='complex128')
         for i in range(self.basis.shape[0]):
             statei = self.basis[i]
             Si = statei[0]/2.
@@ -2483,16 +2057,18 @@ class Magnetics():
                             matrix[kk,j,i] += np.conj(matrix[kk,i,j])
 
         matrix = - matrix #the minus sign is because mu = - kL - 2S
-        matrix = np.round(matrix, 16)
+
+        if evaluation:
+            matrix = np.round(matrix, 16)
 
         return matrix
 
     #@staticmethod
-    def effGval(self, levels, evaluation=True, v_matrix=None): 
+    def effGval(self, levels, v_matrix=None): 
 
         if v_matrix is None:
             par = self.par_dict
-            matrix = self.calc.build_matrix(self.Hterms, evaluation = evaluation, **par)  #mi calcolo energia e autovalori ad un certo campo
+            matrix = self.calc.build_matrix(self.Hterms, **par) 
             result = from_matrix_to_result(matrix)
             v_matrix = np.copy(result[1:,:])
         else:
@@ -2500,7 +2076,7 @@ class Magnetics():
 
         levels = np.array(levels)
 
-        mu_matrix = self.mag_moment(1, evaluation=evaluation)  
+        mu_matrix = self.mag_moment(1)  
                                                              
         gexs = np.zeros(10, dtype='int32')
         ngexs = int((levels[1]-levels[0]+1)/2)
@@ -2518,8 +2094,7 @@ class Magnetics():
             for ii in idx1:
                 for jj in idx2:
                     for kk in range(3):
-                        CI=1
-                        gk[kk,ii,jj] = np.dot(np.conj(v_matrix[:,ii]).T, np.dot(CI*mu_matrix[kk,...],v_matrix[:,jj]))
+                        gk[kk,ii,jj] = np.dot(np.conj(v_matrix[:,ii]).T, np.dot(mu_matrix[kk,...],v_matrix[:,jj]))
 
             gx11 = gk[0,j,j]; gx12 = gk[0,j,j+1]; gx21 = gk[0,j+1,j]; gx22 = gk[0,j+1,j+1];
             gy11 = gk[1,j,j]; gy12 = gk[1,j,j+1]; gy21 = gk[1,j+1,j]; gy22 = gk[1,j+1,j+1];
@@ -2540,7 +2115,7 @@ class Magnetics():
         return np.sqrt(2*w),v
 
 
-    def susceptibility_field(self, fields, temp, delta=0.001, evaluation=True, wordy=False):
+    def susceptibility_field(self, fields, temp, delta=0.001, wordy=False):
 
         par = self.par_dict
 
@@ -2548,14 +2123,14 @@ class Magnetics():
         susc_list = np.zeros(fields.shape[0])
         mu = np.zeros((fields.shape[0], self.basis.shape[0], 2), dtype='complex128')
 
-        mu_matrix = self.mag_moment(1, evaluation=evaluation)
+        mu_matrix = self.mag_moment(1)
 
         for i in range(fields.shape[0]):  #calcolo un tensore per campo
-            print('FIELD: '+str(fields[i])+'\n' if wordy else "", end = "")
+            print(str(i)+' FIELD: '+str(fields[i])+'\n' if wordy else "", end = "")
 
             par['field'] = fields[i]  #se ci metto abs viene come OctoYot
             weights = fields[i]/np.linalg.norm(fields[i])
-            matrix = self.calc.build_matrix(self.Hterms, evaluation = evaluation, **par)  #mi calcolo energia e autovalori ad un certo campo
+            matrix = self.calc.build_matrix(self.Hterms, **par)  #mi calcolo energia e autovalori ad un certo campo
             result = from_matrix_to_result(matrix)
             E = (result[0,:].real-min(result[0,:].real)) * 1.9865e-23   # per convertire da cm-1 a J
             # print(E/1.9865e-23)
@@ -2578,7 +2153,7 @@ class Magnetics():
 
             B_inc = fields[i]/np.linalg.norm(fields[i])*delta
             par['field'] = fields[i]+B_inc
-            matrix = self.calc.build_matrix(self.Hterms, evaluation=evaluation, **par)  #mi calcolo energia e autovalori ad un certo campo
+            matrix = self.calc.build_matrix(self.Hterms, **par)  #mi calcolo energia e autovalori ad un certo campo
             result = from_matrix_to_result(matrix)
             E = (result[0,:].real-min(result[0,:].real)) * 1.9865e-23   # per convertire da cm-1 a J
             den = 0
@@ -2598,7 +2173,7 @@ class Magnetics():
 
             B_inc = fields[i]/np.linalg.norm(fields[i])*delta
             par['field'] = fields[i]-B_inc
-            matrix = self.calc.build_matrix(self.Hterms, evaluation=evaluation, **par)  #mi calcolo energia e autovalori ad un certo campo
+            matrix = self.calc.build_matrix(self.Hterms, **par)  #mi calcolo energia e autovalori ad un certo campo
             result = from_matrix_to_result(matrix)
             E = (result[0,:].real-min(result[0,:].real)) * 1.9865e-23   # per convertire da cm-1 a J
             den = 0
@@ -2637,18 +2212,16 @@ class Magnetics():
         return M_list, susc_list, fields[idxM], fields[idxm], idxM, idxm, (sopra, sotto)
     
 
-    def susceptibility_B_copy(self, fields, temp, delta=0.001, evaluation=True, wordy=False):
+    def susceptibility_B_copy(self, fields, temp, delta=0.001, wordy=False):
         # computes the magnetic susceptibility tensor as the derivative of the magnetization vector in x,y,z
         # for a set of field vectors (evenly sampled on a sphere) at a certain temperature
         # delta is the differentiation step
-
-        #inizio modifiche 
 
         def M_vector_in(field_vec):
             mu = np.zeros((self.basis.shape[0], 3), dtype='complex128')
             par['field'] = field_vec
             # print(field_vec)
-            matrix = self.calc.build_matrix(self.Hterms, evaluation=evaluation, **par)  #hamiltonian matrix for a field vector B
+            matrix = self.calc.build_matrix(self.Hterms, **par)  #hamiltonian matrix for a field vector B
             # print('old',matrix)
             result = from_matrix_to_result(matrix)
             E = (result[0,:].real-min(result[0,:].real)) #* 1.9865e-23
@@ -2685,7 +2258,7 @@ class Magnetics():
         Mag_vector = np.zeros((fields.shape[0],3))
         mu = np.zeros((fields.shape[0], self.basis.shape[0], 4, 3), dtype='complex128')
         chi = np.zeros((fields.shape[0], 3, 3))
-        mu_matrix = self.mag_moment(k, evaluation=evaluation)  #computes the magnetic moments matrix <i|kL + geS|j>
+        mu_matrix = self.mag_moment(k)  #computes the magnetic moments matrix <i|kL + geS|j>
 
         for i in range(fields.shape[0]):
             print('FIELD: '+str(fields[i])+'\n' if wordy else "", end = "")
@@ -2723,7 +2296,7 @@ class Magnetics():
         chi_tensor = np.sum(chi, axis=0)/fields.shape[0]   #since I've calculated the tensor for different directions of the magnetic field vector, here there is the average calculation
         Mav = np.sum(Mag_vector, axis=0)/fields.shape[0]    #same for magnetization
 
-        return chi_tensor, Mav
+        return chi_tensor, Mav*self.muB*1.9865e-23
 
     # @staticmethod
     # @cron
@@ -2789,6 +2362,7 @@ class Magnetics():
 
         mu0 = 1.25663706212e-06
         muB = 0.4668517532494337
+        Jconv = 1.9865e-23
 
         #print('ord1')
         mu_matrix = mag_moment(basis)  #complex128[:,:,:]
@@ -2801,8 +2375,8 @@ class Magnetics():
             for idx in range(3):
                 #print('idx',idx)
                 chi_comp, err_comp = self.dfridr(M_vector, fields[i], delta, idx, chi.shape[1:], fargs=(mu_matrix, LF_matrix, basis, temp))
-                chi[i,idx] = chi_comp * mu0*muB*1.9865e-23
-                err[i,idx] = np.ones(chi_comp.shape)*err_comp * mu0*muB*1.9865e-23
+                chi[i,idx] = chi_comp * mu0*muB*Jconv
+                err[i,idx] = np.ones(chi_comp.shape)*err_comp * mu0*muB*Jconv
 
         chi_tensor = np.zeros((3,3))
         chi_tensor = np.sum(chi, axis=0)/fields.shape[0]
@@ -2810,439 +2384,6 @@ class Magnetics():
 
         return (chi_tensor, err_tensor)
 
-    ### NOT TESTED ###
-    def susceptibility_EB(self, fields, temp, evaluation=True, wordy=False, **par):
-
-        try:
-            k=par['k']
-        except:
-            k=1
-
-        delta = 0.001  #in Tesla
-        delta1 = delta
-        E = np.zeros((fields.shape[0], self.basis.shape[0], 4), dtype='float64')
-        E_inc = np.zeros((fields.shape[0], 3, self.basis.shape[0], 4), dtype='float64')
-        chi = np.zeros((fields.shape[0], 3, 3))  # (campo x tensore)
-        kt = self.kB*temp/1.9865e-23  #in cm-1
-        for i in range(fields.shape[0]):  #calcolo un tensore per campo
-            print('FIELD: '+str(fields[i])+'\n' if wordy else "", end = "")
-            par['field'] = fields[i]  #se ci metto abs viene come OctoYot
-            result = self.calc.MatrixH(self.Hterms, self.basis, evaluation=evaluation, **par, wordy=wordy)  #mi calcolo energia e autovalori ad un certo campo
-            E[i,:,0] = result[0,:].real#*1.9865e-23  # per convertire da cm-1 a J
-            field_inc = np.zeros((3,3))
-            for comp in range(3):    # incr x y z
-                field_inc[comp] = np.copy(fields[i])
-                field_inc[comp, comp] += delta1
-                #print('field: ', field_inc[comp])
-                par['field'] = field_inc[comp]
-                result = self.calc.MatrixH(self.Hterms, self.basis, evaluation=evaluation, **par, wordy=wordy)
-                E[i,:,1+comp] = result[0,:].real#*1.9865e-23    # per convertire da cm-1 a J
-            M = np.zeros(3)
-            mu = np.zeros((self.basis.shape[0], 3))
-            for kk in range(3):
-                num = 0
-                den = 0
-                for j in range(self.basis.shape[0]):
-                    mu[j,kk] = -(E[i,j,1+kk]-E[i,j,0])/delta1/self.muB
-                    #print(mu[i,j,kk], E[i,j,0], E[i,j,1+kk])
-
-                    num += mu[j,kk]*np.exp(-E[i,j,0]/kt)
-                    den += np.exp(-E[i,j,0]/kt)
-                M[kk] = num/den
-
-            field_inc = np.zeros((3,3))
-            M_inc = np.zeros((3,3))
-            for comp in range(3):    # incr x y z
-                field_inc[comp] = np.copy(fields[i])
-                field_inc[comp, comp] += delta
-                #print('FIELD: ', field_inc[comp])
-                par['field'] = field_inc[comp]
-                result = self.calc.MatrixH(self.Hterms, self.basis, evaluation=evaluation, **par, wordy=wordy)  #mi calcolo energia e autovalori ad un certo campo
-                E_inc[i,comp,:,0] = result[0,:].real#*1.9865e-23  # per convertire da cm-1 a J
-                field_inc_inc = np.zeros((3,3))
-                for kk in range(3):    # incr x y z
-                    field_inc_inc[kk] = np.copy(field_inc[comp])
-                    field_inc_inc[kk, kk] += delta1
-                    #print('field: ', field_inc_inc[kk])
-                    par['field'] = field_inc_inc[kk]
-                    result = self.calc.MatrixH(self.Hterms, self.basis, evaluation=evaluation, **par, wordy=wordy)
-                    E_inc[i,comp,:,1+kk] = result[0,:].real#*1.9865e-23    # per convertire da cm-1 a J
-                mu = np.zeros((self.basis.shape[0], 3))
-                for kk in range(3):
-                    num = 0
-                    den = 0
-                    for j in range(self.basis.shape[0]):
-                        mu[j,kk] = -(E_inc[i,comp,j,1+kk]-E_inc[i,comp,j,0])/delta1/self.muB
-                        #print(mu[i,j,kk], E_inc[comp,i,j,0], E_inc[comp,i,j,1+kk])
-                        num += mu[j,kk]*np.exp(-E_inc[i,comp,j,0]/kt)
-                        den += np.exp(-E_inc[i,comp,j,0]/kt)
-                    M_inc[comp,kk] = num/den
-                #print('M_inc',M_inc[comp])
-
-            for kki in range(3): #magnetizzazione
-                for kkj in range(3):   #campo
-                    chi[i,kki,kkj] = ((M_inc[kkj,kki]-M[kki])/(delta))*self.mu0*self.muB*1.9865e-23  #chi_ab = dMa/dBb
-
-            print('M (BM)\n'+str(M)+'\n' if wordy else "", end = "")
-            print('M_inc (BM)\n'+str(M_inc)+'\n' if wordy else "", end = "")
-            print('chi (m3)\n'+str(chi[i,:,:])+'\n' if wordy else "", end = "")
-
-        chi_tensor = np.zeros((3,3))
-        chi_tensor = np.sum(chi, axis=0)/fields.shape[0]
-
-        return chi_tensor
-
-    ### NOT TESTED ###
-    def susceptibility_VV(self, fields, temp, evaluation=True, ret_energy=False, save_energy=(False,0), wordy=False, **par):
-        #implementation Van Vleck (approximation for low field values)
-
-        from itertools import groupby
-
-        try:
-            k=par['k']
-        except:
-            k=1
-
-        #calcolo a campo = 0
-        par['field'] = np.array([0.,0.,0.])
-        result_0 = self.calc.MatrixH(self.Hterms, self.basis, evaluation=evaluation, **par, wordy=wordy)
-        E_0_deg = result_0[0,:]# * 1.9865e-23   # per convertire da cm-1 a J
-        # E_0_deg = np.round(E_0_deg.real*1e23, 3)*1e-23
-        E_0_deg = np.round(E_0_deg.real, 10)
-        energy_0 = min(E_0_deg)
-
-        kt = self.kB*temp/1.9865e-23
-
-        mu_int = np.zeros((fields.shape[0], self.basis.shape[0], 3), dtype='complex128') #for pert 1 ord  #(campo x stato x componente)
-        mu_int2 =  np.zeros((fields.shape[0], self.basis.shape[0], self.basis.shape[0], 3), dtype='complex128') #for pert 2 ord (campo x i x j x comp) <i|mu|j>
-        chi_approx = np.zeros((fields.shape[0], 3, 3),dtype='float64')  # (campo x tensore)
-        chi_VV = np.zeros((fields.shape[0], 3, 3), dtype='float64')
-        #chi_prova = np.zeros((fields.shape[0], 3, 3), dtype='float64')
-        E_pert = np.zeros(self.basis.shape[0], dtype='float64')
-        E_diag = np.zeros(self.basis.shape[0], dtype='float64')
-        for i in range(fields.shape[0]):  #calcolo un tensore per campo
-            print('\nFIELD: '+str(fields[i])+'\n' if wordy else "", end = "")
-            #calcolo a campo != 0
-            #fields[i] = np.array([28.,0.,0.])#np.abs(fields[i])
-            par['field'] = fields[i]
-            result = self.calc.MatrixH(self.Hterms, self.basis, evaluation=evaluation, **par, wordy=wordy)
-            E_field = result[0,:].real #risultato vero
-            E_field = np.round(E_field.real, 10)
-            energy_field = min(E_field)
-            E_diag += E_field
-
-            mu_matrix = self.mag_moment(k, evaluation=evaluation)  #è indipendente dal campo
-            #aggiusto la base nel caso ci fossero stati degeneri
-            E_0 = [list(j) for i, j in groupby(E_0_deg)]  #lista di liste di tuple (energia, indice lvl)
-
-            E1 = np.zeros_like(E_0_deg, dtype='float64')
-
-            for ii in range(len(E_0)):  #cicla sui gruppi di stati quindi non sono gli indici giusti
-                if len(E_0[ii])>1:
-                    print('\nDEGENERATE STATE\n' if wordy else "", end = "")
-                    index = [i for i,num in enumerate(E_0_deg) if num in E_0[ii]]
-                    print(str(index)+'\n' if wordy else "", end = "")
-                    H1 = np.zeros((len(E_0[ii]),len(E_0[ii])), dtype='complex128')
-                    result_new = np.zeros((self.basis.shape[0], len(E_0[ii])), dtype='complex128')
-                    for ji, ind1 in enumerate(range(index[0],index[-1]+1)):  #indici di stati
-                        for jj, ind2 in enumerate(range(index[0],index[-1]+1)):
-                            # print(ji, ind1)
-                            # print(jj, ind2)
-                            for kk in range(3):
-                                if kk==1:
-                                    CI=-1j
-                                else:
-                                    CI=1
-                                mu = 0
-                                for j in range(self.basis.shape[0]):
-                                    for l in range(self.basis.shape[0]):
-                                        mu += np.conj(result_0[j+1,ind1])*CI*mu_matrix[kk,j,l]*result_0[l+1,ind2]
-                                # print(mu, kk, ind1, ind2)
-                                H1[ji,jj] += self.muB*fields[i,kk]*mu
-
-                                if ji==jj:
-                                    if np.abs(mu.real)<1e-9:
-                                        pass
-                                    else:
-                                        mu_int[i,ind1,kk] = mu.real
-                    # print('matrice_perturbazione\n', H1)
-
-                    v, w = np.linalg.eig(H1)
-                    # print('v: ', v)
-
-                    for j, ind1 in enumerate(range(index[0],index[-1]+1)):
-                        E1[ind1] = v[j].real
-
-                    for jj in range(len(E_0[ii])):
-                        for j, ind1 in enumerate(range(index[0],index[-1]+1)):
-                            result_new[:,jj] += w[j,jj]*result_0[1:,ind1]
-
-                    print('Orthogonality check... \n' if wordy else "", end = "")
-                    orth = True
-                    for ind1 in range(len(w)):
-                        for ind2 in range(len(w)):
-                            if ind1 != ind2:
-                                check = np.abs(np.dot(np.conj(result_new[:,ind1]).T, result_new[:,ind2]))
-                                if round(check, 10) != 0:
-                                    orth=False
-
-                    if orth==False:
-                        print('Orthogonalization procedure...\n' if wordy else "", end = "")
-
-                        for j in range(1,len(w)):
-                            for jj in range(0,j):
-                                if j!=jj:
-                                    # print(j,jj)
-                                    result_new[:,j] -= np.dot(np.conj(result_new[:,j]).T, result_new[:,jj])/np.dot(np.conj(result_new[:,jj]).T, result_new[:,jj])*result_new[:,jj]
-                        for j in range(len(w)):
-                            result_new[:,j] /= np.sqrt(np.dot(np.conj(result_new[:,j]).T, result_new[:,j]))
-
-                        for ind1 in range(len(w)):
-                            for ind2 in range(len(w)):
-                                if ind1 != ind2:
-                                    check = np.abs(np.dot(np.conj(result_new[:,ind1]).T, result_new[:,ind2]))
-                                    if round(check, 10) != 0:
-                                        orth=False
-                    print('...done\n' if wordy else "", end = "")
-
-                    print('Normalization check... \n' if wordy else "", end = "")
-                    for ind1 in range(len(w)):
-                        check = np.abs(np.dot(np.conj(result_new[:,ind1]).T, result_new[:,ind1]))
-                        if round(check, 10) != 1:
-                            warnings.warn('Non-normalized eigenvectors found')
-                            print(ind1, check)
-                    print('...done\n'  if wordy else "", end = "")
-
-                    #substitute in the old basis
-                    for j,ind1 in enumerate(range(index[0],index[-1]+1)):
-                        result_0[1:,ind1] = result_new[:,j]
-
-                else:
-                    index = [i for i,num in enumerate(E_0_deg) if num in E_0[ii]]
-                    ind = index[0]
-                    #print(index)
-
-                    for kk in range(3):
-                        if kk==1:
-                            CI=-1j
-                        else:
-                            CI=1
-
-                        for j in range(self.basis.shape[0]):
-                            for l in range(self.basis.shape[0]):
-                                mu_int[i,ind,kk] += np.conj(result_0[j+1,ind])*CI*mu_matrix[kk,j,l]*result_0[l+1,ind]
-
-                        if np.abs(mu_int[i,ind,kk].imag)<1e-9:
-                            if np.abs(mu_int[i,ind,kk].real)<1e-9:
-                                mu_int[i,ind,kk] = 0
-                            else:
-                                mu_int[i,ind,kk] = np.copy(mu_int[i,ind,kk].real)
-                        else:
-                            print('complex', mu_int[i,ind,kk])
-                        # print(mu[i,index[0],kk], fields[i,kk])
-                        E1[ind] += self.muB*fields[i,kk]*mu_int[i,ind,kk].real
-
-            E_01 = np.sort(E_0_deg+E1)
-            # for ii in range(self.basis.shape[0]):
-            #     print(f'{E_field[ii]:.5f}'+'\t'+f'{E_0_deg[ii]:.5f}'+'\t'+f'{E_01[ii]:.5f}')
-
-            #ricalcolo mu_int con la base nuova mu_int(campo x i x comp)
-            for ind in range(self.basis.shape[0]):
-                for kk in range(3):
-                    if kk==1:
-                        CI=-1j
-                    else:
-                        CI=1
-                    mu_int[i,ind,kk] = np.dot(np.conj(result_0[1:,ind]).T, np.dot(CI*mu_matrix[kk,...],result_0[1:,ind]))
-
-            #calcolo i contributi al secondo ordine
-            #ricalcolo tutti gli integrali misti <i|mu|j> anche tra stati degeneri (anche se so che saranno zero, visto che ho riaggiustato la base)
-            # mu_int2(campo x i x j x comp)
-            E2 = np.zeros_like(E_0_deg, dtype='float64')
-            for ind1 in range(self.basis.shape[0]):
-                for ind2 in range(self.basis.shape[0]):
-                    for kk in range(3):
-                        if kk==1:
-                            CI=-1j
-                        else:
-                            CI=1
-                        mu_int2[i,ind1,ind2,kk] = np.dot(np.conj(result_0[1:,ind1]).T, np.dot(CI*mu_matrix[kk,...],result_0[1:,ind2]))
-
-            for ind1 in range(self.basis.shape[0]):
-                for ind2 in range(self.basis.shape[0]):
-                    if ind2!=ind1:
-                        for kki in range(3):
-                            for kkj in range(3):
-                                if E_0_deg[ind1]-E_0_deg[ind2]!=0:
-                                    E2[ind1] += np.real(mu_int2[i,ind1,ind2,kki]*mu_int2[i,ind2,ind1,kkj]*fields[i,kkj]*fields[i,kki]*self.muB**2/(E_0_deg[ind1]-E_0_deg[ind2]))
-                    else:
-                        pass
-                #same as
-                # a = 0
-                # for kki in range(3):
-                #     b = 0
-                #     for kkj in range(3):
-                #         somma = 0
-                #         for ind2 in range(self.basis.shape[0]):
-                #             if ind2 != ind1 and E_0_deg[ind1]-E_0_deg[ind2]!=0:
-                #                 somma += mu_int2[i,ind1,ind2,kki]*mu_int2[i,ind2,ind1,kkj]/(E_0_deg[ind1]-E_0_deg[ind2])
-                #         b += somma*fields[i,kkj]*self.muB
-                #     a += b*fields[i,kki]*self.muB
-                # if np.abs(a.imag)<1e-9:
-                #     E2[ind1] += a.real
-                # elif np.abs(a.imag)>1e-9:
-                #     print('complex')
-                # else:
-                #     pass
-
-            E_012 = np.sort(E_0_deg+E1+E2)
-            E_pert += E_012
-            print('\nEB\t\tE0\t\tE0+E1\t\tE0+E1+E2\n' if wordy else "", end = "")
-            for ii in range(self.basis.shape[0]):
-                print(f'{E_field[ii]:.5f}'+'\t'+f'{E_0_deg[ii]:.5f}'+'\t'+f'{E_01[ii]:.5f}'+'\t'+f'{E_012[ii]:.5f}'+'\n' if wordy else "", end = "")
-
-            #calcolo chi approx
-            #mu_int(campo x i x comp)
-            #mu_int2(campo x i x j x comp)
-            #chi_approx(field, 3, 3)
-            for kki in range(3):
-                for kkj in range(3):
-                    num = 0
-                    den = 0
-                    for ind1 in range(self.basis.shape[0]):
-                        somma = 0
-                        for ind2 in range(self.basis.shape[0]):
-                            if E_0_deg[ind1]-E_0_deg[ind2]!=0:
-                                somma += (mu_int2[i,ind1,ind2,kki]*mu_int2[i,ind2,ind1,kkj] + mu_int2[i,ind1,ind2,kkj]*mu_int2[i,ind2,ind1,kki])/(E_0_deg[ind1]-E_0_deg[ind2])
-                        num += (mu_int[i,ind1,kki]*mu_int[i,ind1,kkj]/kt - somma)*np.exp(-E_0_deg[ind1]/kt)
-                        den += np.exp(-E_0_deg[ind1]/kt)
-                    chi_approx[i,kki,kkj] = np.real(num/den) * self.mu0*self.muB**2*1.9865e-23
-
-            #print(chi_approx[i])
-
-            #calcolo chi not approx
-            #chi_VV(field,3,3)
-            E_2nd_order = E_0_deg+E1+E2 #non riordinato
-            for kki in range(3):
-                for kkj in range(3):
-                    num = 0
-                    den = 0
-                    for ind1 in range(self.basis.shape[0]):
-                        somma = 0
-                        for ind2 in range(self.basis.shape[0]):
-                            if E_0_deg[ind1]-E_0_deg[ind2]!=0:
-                                somma += (mu_int2[i,ind1,ind2,kki]*mu_int2[i,ind2,ind1,kkj] + mu_int2[i,ind1,ind2,kkj]*mu_int2[i,ind2,ind1,kki])/(E_0_deg[ind1]-E_0_deg[ind2])
-                        num += (- somma)*np.exp(-E_2nd_order[ind1]/kt)
-                        den += np.exp(-E_2nd_order[ind1]/kt)
-                    chi_VV[i,kki,kkj] = np.real(num/den) * self.mu0*self.muB**2*1.9865e-23
-
-            #print(chi_VV[i])
-            # E_2nd_order = E_0_deg+E1+E2 #non riordinato
-            # for kki in range(3):
-            #     for kkj in range(3):
-            #         num = 0
-            #         den = 0
-            #         for ind1 in range(self.basis.shape[0]):
-            #             num += (- somma)*np.exp(-E_2nd_order[ind1]/kt)
-            #             den += np.exp(-E_2nd_order[ind1]/kt)
-            #         chi_VV[i,kki,kkj] = np.real(num/den) * self.mu0*self.muB*1.9865e-23
-
-
-        E_diag /= fields.shape[0]
-        E_pert /= fields.shape[0]
-
-        chi_approx_tensor = np.zeros((3,3))
-        chi_approx_tensor = np.sum(chi_approx, axis=0)/fields.shape[0]
-        chi_VV_tensor = np.zeros((3,3))
-        chi_VV_tensor = np.sum(chi_VV, axis=0)/fields.shape[0]
-
-        if save_energy[0]==True:
-            with open('Energies'+str(int(save_energy[-1]))+'.txt', 'w') as f:
-                f.write('EB\t\tE0\t\tE0+E1+E2\n')
-                for ii in range(len(E_field)):
-                    f.write(f'{E_diag[ii]:.5f}'+'\t'+f'{E_0_deg[ii]:.5f}'+'\t'+f'{E_pert[ii]:.5f}'+'\n')
-
-        if ret_energy==True:
-            return E_diag, E_pert, chi_approx_tensor, chi_VV_tensor
-        else:
-            return chi_approx_tensor, chi_VV_tensor
-
-    ### NOT TESTED ###
-    def susceptibility_Brill(self, fields, temp, delta=0.001, evaluation=True, wordy=False, **par):
-        #parigi 2019 eq 54
-
-        try:
-            k=par['k']
-        except:
-            k=1
-
-        delta1 = delta
-        E = np.zeros((fields.shape[0], self.basis.shape[0], 4), dtype='float64')
-        E_inc = np.zeros((fields.shape[0], 3, self.basis.shape[0], 4), dtype='float64')
-        chi = np.zeros((fields.shape[0], 3, 3))  # (campo x tensore)
-        kt = self.kB*temp/1.9865e-23  #in cm-1
-        for i in range(fields.shape[0]):  #calcolo un tensore per campo
-            print('FIELD: '+str(fields[i])+'\n' if wordy else "", end = "")
-            par['field'] = fields[i]  #se ci metto abs viene come OctoYot
-            result = self.calc.MatrixH(self.Hterms, self.basis, evaluation=evaluation, **par, wordy=wordy)  #mi calcolo energia e autovalori ad un certo campo
-            E[i,:,0] = result[0,:].real#*1.9865e-23  # per convertire da cm-1 a J
-            field_inc = np.zeros((3,3))
-            for comp in range(3):    # incr x y z
-                field_inc[comp] = np.copy(fields[i])
-                field_inc[comp, comp] += delta1
-                #print('field: ', field_inc[comp])
-                par['field'] = field_inc[comp]
-                result = self.calc.MatrixH(self.Hterms, self.basis, evaluation=evaluation, **par, wordy=wordy)
-                E[i,:,1+comp] = result[0,:].real#*1.9865e-23    # per convertire da cm-1 a J
-            M = np.zeros(3)
-            for kk in range(3):
-                somma_inc = 0
-                somma = 0
-                for j in range(self.basis.shape[0]):
-                    somma_inc += np.exp(-(E[i,j,1+kk]-min(E[i,:,0]))/kt)
-                    somma += np.exp(-(E[i,j,0]-min(E[i,:,0]))/kt)
-
-                M[kk] = (np.log(somma_inc)-np.log(somma))/delta
-
-            field_inc = np.zeros((3,3))
-            M_inc = np.zeros((3,3))
-            for comp in range(3):    # incr x y z
-                field_inc[comp] = np.copy(fields[i])
-                field_inc[comp, comp] += delta
-                #print('FIELD: ', field_inc[comp])
-                par['field'] = field_inc[comp]
-                result = self.calc.MatrixH(self.Hterms, self.basis, evaluation=evaluation, **par, wordy=wordy)  #mi calcolo energia e autovalori ad un certo campo
-                E_inc[i,comp,:,0] = result[0,:].real#*1.9865e-23  # per convertire da cm-1 a J
-                field_inc_inc = np.zeros((3,3))
-                for kk in range(3):    # incr x y z
-                    field_inc_inc[kk] = np.copy(field_inc[comp])
-                    field_inc_inc[kk, kk] += delta1
-                    #print('field: ', field_inc_inc[kk])
-                    par['field'] = field_inc_inc[kk]
-                    result = self.calc.MatrixH(self.Hterms, self.basis, evaluation=evaluation, **par, wordy=wordy)
-                    E_inc[i,comp,:,1+kk] = result[0,:].real#*1.9865e-23    # per convertire da cm-1 a J
-                for kk in range(3):
-                    somma_inc = 0
-                    somma = 0
-                    for j in range(self.basis.shape[0]):
-                        somma_inc += np.exp(-(E_inc[i,comp,j,1+kk]-min(E[i,:,0]))/kt)
-                        somma += np.exp(-(E_inc[i,comp,j,0]-min(E[i,:,0]))/kt)
-
-                    M_inc[comp, kk] = (np.log(somma_inc)-np.log(somma))/delta
-                #print('M_inc',M_inc[comp])
-
-            for kki in range(3): #magnetizzazione
-                for kkj in range(3):   #campo
-                    chi[i,kki,kkj] = ((M_inc[kkj,kki]-M[kki])/(delta))*self.mu0*self.muB**2*1.9865e-23*kt  #chi_ab = dMa/dBb
-
-            print('M (BM)\n'+str(M)+'\n' if wordy else "", end = "")
-            print('M_inc (BM)\n'+str(M_inc)+'\n' if wordy else "", end = "")
-            print('chi (m3)\n'+str(chi[i,:,:])+'\n' if wordy else "", end = "")
-
-        chi_tensor = np.zeros((3,3))
-        chi_tensor = np.sum(chi, axis=0)/fields.shape[0]
-
-        return chi_tensor
 
 #########PROJECTIONS###########
 
@@ -3368,99 +2509,166 @@ def the_highest_L(proj, conf):
 
     return L, perc
 
-
 #######FIGURES###########
 
-def tensor_rep(A, name=None, angles=(0,0)):
-    #represents the rank2 tensors as linear combination of spherical harmonics
+def fig_tensor_rep_1(tensor, n_points=40):
 
-    import matplotlib.gridspec as gridspec
+    u = np.linspace(0, 2 * np.pi, n_points)
+    v = np.linspace(0, np.pi, n_points)
+    x = np.outer(np.cos(u), np.sin(v))
+    y = np.outer(np.sin(u), np.sin(v))
+    z = np.outer(np.ones_like(u), np.cos(v))
+
+    points = np.stack((x.ravel(), y.ravel(), z.ravel()), axis=1)  # Shape: (N, 3)
+    points = points / np.linalg.norm(points, axis=1)[:, np.newaxis]
+
+    # Initialize result array
+    N = points.shape[0]
+    magnitudes = np.zeros(N)
+
+    # Compute M(n) for each vector n
+    for idx in range(N):
+        n = points[idx]  # Extract the vector
+        magnitudes[idx] = n.T @ tensor @ n  # Matrix-vector operations
+
+    x_scaled = (x.ravel() * magnitudes).reshape(x.shape)
+    y_scaled = (y.ravel() * magnitudes).reshape(y.shape)
+    z_scaled = (z.ravel() * magnitudes).reshape(z.shape)
+
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Normalize magnitudes for coloring
+    norm = plt.Normalize(magnitudes.min(), magnitudes.max())
+    colors = plt.cm.turbo(norm(magnitudes).reshape(x.shape))
+
+    # Plot the surface with facecolors based on magnitudes
+    ax.plot_surface(x_scaled, y_scaled, z_scaled, facecolors=colors, edgecolor='k', alpha=1, linewidth=0.5)
+
+    # Set transparent background
+    fig.patch.set_alpha(0.0)
+    ax.patch.set_alpha(0.0)
+
+    # Hide the axes and labels
+    ax.set_axis_off()
+
+    # Calculate the limits for each axis
+    x_limits = [x_scaled.min(), x_scaled.max()]
+    y_limits = [y_scaled.min(), y_scaled.max()]
+    z_limits = [z_scaled.min(), z_scaled.max()]
+
+    # Determine the widest range
+    all_limits = np.array([x_limits, y_limits, z_limits])
+    widest_range = all_limits.max() - all_limits.min()
+
+    # Set all axes to the same range
+    ax.set_xlim(all_limits.min(), all_limits.min() + widest_range)
+    ax.set_ylim(all_limits.min(), all_limits.min() + widest_range)
+    ax.set_zlim(all_limits.min(), all_limits.min() + widest_range)
+
+    # Add a colorbar
+    mappable = plt.cm.ScalarMappable(cmap='turbo', norm=norm)
+    mappable.set_array(magnitudes)
+    plt.colorbar(mappable, ax=ax, shrink=0.5, aspect=5)
+
+    plt.show()
+
+def fig_tensor_rep_2(tensor, n_points=100):
+
     from mpl_toolkits.mplot3d import Axes3D
-    from scipy.special import sph_harm
 
-    # Grids of polar and azimuthal angles
-    theta = np.linspace(0, np.pi, 50)
-    phi = np.linspace(0, 2*np.pi, 50)
-    # Create a 2-D meshgrid of (theta, phi) angles.
-    theta, phi = np.meshgrid(theta, phi)
-    # Calculate the Cartesian coordinates of each point in the mesh.
-    xyz = np.array([np.sin(theta) * np.sin(phi),
-                    np.sin(theta) * np.cos(phi),
-                    np.cos(theta)])
+    eigenvalues, eigenvectors = np.linalg.eigh(tensor)
 
-    def plot_Y(ax, el, m, k=1):
-        """Plot the spherical harmonic of degree el and order m on Axes ax."""
+    u = np.linspace(0, 2 * np.pi, n_points)
+    v = np.linspace(0, np.pi, n_points)
+    x = np.outer(np.cos(u), np.sin(v))
+    y = np.outer(np.sin(u), np.sin(v))
+    z = np.outer(np.ones_like(u), np.cos(v))
 
-        if len(el)>1:
-            Yx, Yy, Yz = np.zeros_like(xyz)
-            for i in range(len(el)):
-                # NB In SciPy's sph_harm function the azimuthal coordinate, theta,
-                # comes before the polar coordinate, phi.
-                Y = k[i]*sph_harm(abs(m[i]), el[i], phi, theta)
-                # Linear combination of Y_l,m and Y_l,-m to create the real form.
-                if m[i] < 0:
-                    Y = np.sqrt(2) * (-1)**m[i] * Y.imag
-                elif m[i] > 0:
-                    Y = np.sqrt(2) * (-1)**m[i] * Y.real
-                yx, yy, yz = (np.abs(Y) * xyz)
-                Yx += yx
-                Yy += yy
-                Yz += yz
-        else:
-            Y = sph_harm(abs(m), el, phi, theta)
-            # Linear combination of Y_l,m and Y_l,-m to create the real form.
-            if m < 0:
-                Y = np.sqrt(2) * (-1)**m * Y.imag
-            elif m > 0:
-                Y = np.sqrt(2) * (-1)**m * Y.real
-            Yx, Yy, Yz = k*(np.abs(Y) * xyz)
+    sphere = np.stack((x.ravel(), y.ravel(), z.ravel()))
 
-        # Colour the plotted surface according to the sign of Y.
-        cmap = plt.cm.ScalarMappable(cmap=plt.get_cmap('RdBu_r'))  #rosso positivo, blu negativo
-        cmap.set_clim(-0.5, 0.5)
+    ellipsoid = eigenvectors @ np.diag(np.sqrt(eigenvalues)) @ sphere
+    x_ellipsoid, y_ellipsoid, z_ellipsoid = ellipsoid.reshape(3, *x.shape)
 
-        ax.plot_surface(Yx, Yy, Yz,
-                        facecolors=cmap.to_rgba(Y.real),
-                        rstride=2, cstride=2)
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111, projection='3d')
 
-        # Draw a set of x, y, z axes for reference.
-        delta=0.2
-        ax_lim = [np.amax(np.abs(Yx)), np.amax(np.abs(Yy)), np.amax(np.abs(Yz))]
-        ax.plot([-ax_lim[0], ax_lim[0]], [0,0], [0,0], c='0.5', lw=1, zorder=10)
-        ax.plot([0,0], [-ax_lim[1], ax_lim[1]], [0,0], c='0.5', lw=1, zorder=10)
-        ax.plot([0,0], [0,0], [-ax_lim[2], ax_lim[2]], c='0.5', lw=1, zorder=10)
-        # Set the Axes limits and title, turn off the Axes frame.
-        ax.set_title(r'$Y_{{{},{}}}$'.format(el, m))
-        ax.set_xlim(-ax_lim[0]+delta, ax_lim[0]+delta)
-        ax.set_ylim(-ax_lim[1]+delta, ax_lim[1]+delta)
-        ax.set_zlim(-ax_lim[2]+delta, ax_lim[2]+delta)
-        #ax.axis('off')
+    ax.plot_surface(x_ellipsoid, y_ellipsoid, z_ellipsoid, color='b', alpha=0.6, edgecolor='k')
 
-    S_A = np.zeros_like(A)
-    N_A = np.zeros_like(A)
-    for i in range(A.shape[0]):
-        for j in range(A.shape[1]):
-            S_A[i,j] = (1/2)*(A[i,j]+A[j,i])
-            N_A[i,j] = S_A[i,j]-(1/3)*np.trace(A)
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_zlabel('Z-axis')
 
-    el = [2,2,2,2,2]
-    m = [0, 1, -1, 2, -2]
-    k = np.array([np.sqrt(3/2)*N_A[2,2], (1/2)*(N_A[2,0]+1j*N_A[2,1]), (1/2)*(N_A[2,0]-1j*N_A[2,1]), (1/2)*(N_A[0,0]-N_A[1,1]+2*1j*N_A[0,1]), (1/2)*(N_A[0,0]-N_A[1,1]-2*1j*N_A[0,1])])
-    k /= max(np.abs(np.real(k)))
+    x_limits = [x_ellipsoid.min(), x_ellipsoid.max()]
+    y_limits = [y_ellipsoid.min(), y_ellipsoid.max()]
+    z_limits = [z_ellipsoid.min(), z_ellipsoid.max()]
 
-    fig = plt.figure(figsize=plt.figaspect(1.))
-    ax = fig.add_subplot(projection='3d')
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
-    ax.view_init(angles[0], angles[1])  #0,90  0,180, -90,90
-    plot_Y(ax, el, m, k)
-    if name is not None:
-        plt.savefig(name+'.png')
-    else:
-        plt.show()
+    all_limits = np.array([x_limits, y_limits, z_limits])
+    widest_range = all_limits.max() - all_limits.min()
 
-    return 0
+    ax.set_xlim(all_limits.min(), all_limits.min() + widest_range)
+    ax.set_ylim(all_limits.min(), all_limits.min() + widest_range)
+    ax.set_zlim(all_limits.min(), all_limits.min() + widest_range)
+
+    plt.show()
+
+def fig_susc_field(conf, dic_Bkq, temp=2., n_points=20, delta=0.01):
+
+    from mpl_toolkits.mplot3d import Axes3D
+
+    def use_nja_(conf, dic_Bkq, field_vecs, wordy=False):
+
+        calc = calculation(conf, ground_only=True, TAB=True, wordy=wordy)
+        
+        dic = {}
+        dic['dic_bkq'] = dic_Bkq
+
+        Magn = Magnetics(calc, ['Hcf','Hz'], dic)
+        _, susc_field, *_ = Magn.susceptibility_field(fields=field_vecs, temp=temp, delta = delta, wordy=wordy)
+
+        return susc_field
+
+    u = np.linspace(0, 2 * np.pi, n_points)
+    v = np.linspace(0, np.pi, n_points)
+    x = np.outer(np.cos(u), np.sin(v))
+    y = np.outer(np.sin(u), np.sin(v))
+    z = np.outer(np.ones_like(u), np.cos(v))
+
+    points = np.stack((x.ravel(), y.ravel(), z.ravel()), axis=1)  # Shape: (N, 3)
+
+    points = points / np.linalg.norm(points, axis=1)[:, np.newaxis]
+
+    magnitudes = use_nja_(conf, dic_Bkq, points, wordy=True)
+
+    #subtract the average
+    #magnitudes -= np.average(magnitudes)
+
+    x_scaled = (x.ravel() * magnitudes).reshape(x.shape)
+    y_scaled = (y.ravel() * magnitudes).reshape(y.shape)
+    z_scaled = (z.ravel() * magnitudes).reshape(z.shape)
+
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot_surface(x_scaled, y_scaled, z_scaled, cmap='viridis', edgecolor='k', alpha=0.8)
+
+    ax.set_xlabel('X-axis')
+    ax.set_ylabel('Y-axis')
+    ax.set_zlabel('Z-axis')
+
+    x_limits = [x_scaled.min(), x_scaled.max()]
+    y_limits = [y_scaled.min(), y_scaled.max()]
+    z_limits = [z_scaled.min(), z_scaled.max()]
+
+    all_limits = np.array([x_limits, y_limits, z_limits])
+    widest_range = all_limits.max() - all_limits.min()
+
+    ax.set_xlim(all_limits.min(), all_limits.min() + widest_range)
+    ax.set_ylim(all_limits.min(), all_limits.min() + widest_range)
+    ax.set_zlim(all_limits.min(), all_limits.min() + widest_range)
+
+    plt.show()
+
+    return magnitudes, points
 
 def calc_segm(E_val, x=1, spanx=0.5):
     """ Costruisce il segmento (x-spanx/x, E_val), (x+spanx/2, E_val) """
@@ -3694,6 +2902,7 @@ def w_inp_dat(coord_tot, charges_tot, num=1, directory=None):
         f.close()
 
 def read_data(filename, sph_flag = False):
+    #the angles must be in radiants
 
     file = open(filename).readlines()
     coord_m = []
@@ -3933,7 +3142,6 @@ def calc_Bqk(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
             dic_Bqk[f'{k}'].update({f'{q}': dic_Aqk_rk[f'{k}'][f'{q}']*Stev_coeff(str(k), conf)})
 
     return dic_Bqk
-            
 
 def calc_Aqkrk(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
     #in data is (N. ligands x 5)
@@ -3962,18 +3170,18 @@ def calc_Aqkrk(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
         Aqkrk[f'{k}'] = {}
         r_val = r_expect(str(k), conf)
         for q in range(-k,k+1):
-            pref = plm(k,np.abs(q))*(4*np.pi/(2*k+1))**(0.5)
+            pref = plm(k,np.abs(q))*(4*np.pi/(2*k+1))#**(0.5)
             somma = 0
             for i in range(data.shape[0]):
+                sphharmp = scipy.special.sph_harm(np.abs(q), k, coord_sph[i,2],coord_sph[i,1])  #sph_harm(k,q,coord_sph[i,1], coord_sph[i,2])/np.sqrt(4*np.pi/(2*k+1))
+                sphharmm = scipy.special.sph_harm(-np.abs(q), k, coord_sph[i,2],coord_sph[i,1])  #sph_harm(k,-q,coord_sph[i,1], coord_sph[i,2])/np.sqrt(4*np.pi/(2*k+1))
                 r = coord_sph[i,0]*au_conv[1]
-                sphharmp = sph_harm(k,np.abs(q),coord_sph[i,1], coord_sph[i,2])
-                sphharmm = sph_harm(k,-np.abs(q),coord_sph[i,1], coord_sph[i,2])
                 if q==0:
-                    somma += pref*(data[i,-1]*au_conv[0]/r**(k+1))*sphharmp.real
+                    somma += pref*(data[i,-1]*au_conv[0]/r**(k+1))*scipy.special.sph_harm(0, k, coord_sph[i,2],coord_sph[i,1]).real
                 elif q>0:
-                    somma += (-1)**q*pref*(data[i,-1]*au_conv[0]/r**(k+1))*(1/np.sqrt(2))*(sphharmm + (-1)**q*sphharmp).real
+                    somma += pref*(data[i,-1]*au_conv[0]/r**(k+1))*(1/np.sqrt(2))*(sphharmm + (-1)**q*sphharmp).real
                 elif q<0:
-                    somma += -(-1)**q*pref*(data[i,-1]*au_conv[0]/r**(k+1))*(1/np.sqrt(2))*(sphharmm - (-1)**np.abs(q)*sphharmp).imag
+                    somma += (1j*pref*(data[i,-1]*au_conv[0]/r**(k+1))*(1/np.sqrt(2))*(sphharmm - (-1)**q*sphharmp)).real
 
             if sth_param == True:
                 value = (1-sigma_k(str(k), conf))*somma*r_val
@@ -4005,9 +3213,9 @@ def calc_Bkq(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
         coord_sph = data[:,1:-1]
         coord_sph[:,1:] *= np.pi/180
 
-    Aqkrk = {}
+    Bkq = {}
     for k in range(2,2*l+1,2):
-        Aqkrk[f'{k}'] = {}
+        Bkq[f'{k}'] = {}
         prefac = np.sqrt(4*np.pi/(2*k+1))
         r_val = r_expect(str(k), conf)
         for q in range(0,k+1):
@@ -4018,22 +3226,21 @@ def calc_Bkq(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
                 if q==0:
                     somma += prefac*(data[i,-1]*au_conv[0]/r**(k+1))*sphharm.real
                 else:
-                    somma += prefac*(data[i,-1]*au_conv[0]/r**(k+1))*sphharm
+                    somma += (-1)**q*prefac*(data[i,-1]*au_conv[0]/r**(k+1))*sphharm
             if sth_param == True:
                 value = (1-sigma_k(str(k), conf))*somma*r_val
             else:
                 value = somma*r_val
             if np.abs(value)<=bin:
-                Aqkrk[f'{k}'].update({f'{q}': 0})
+                Bkq[f'{k}'].update({f'{q}': 0})
             else:
                 if q!=0:
-                    Aqkrk[f'{k}'].update({f'{q}': value.real})
-                    Aqkrk[f'{k}'].update({f'{-q}': value.imag})
+                    Bkq[f'{k}'].update({f'{q}': value.real})
+                    Bkq[f'{k}'].update({f'{-q}': value.imag})
                 else:
-                    Aqkrk[f'{k}'].update({f'{q}': value})
+                    Bkq[f'{k}'].update({f'{q}': value})
 
-    return Aqkrk
-
+    return Bkq
 
 def from_Vreal_to_V(dic_V):
     #ordine -2, -1, 0, 1, 2
@@ -4048,7 +3255,6 @@ def from_Vreal_to_V(dic_V):
                 }
 
     return dic_Vnew
-
 
 def rota_LF(l, dic_Bkq, A=0, B=0, C=0):
     #qui sono implementate le small-d che servono per ruotare i Bkq
@@ -4202,7 +3408,6 @@ def read_DWigner_quat():
 
     return list_dict[0], dic_matrix_coeff
 
-
 def R_zyz(alpha, beta, gamma):
     #matrice di rotazione in convenzione zyz (active rotation)
 
@@ -4227,7 +3432,6 @@ def from_matrix_to_result(matrix):
     result = np.copy(result[:, result[0,:].argsort()])
     return result
 
-
 def order_two_level_dict(dict1):
     dict_or = {}
     key1 = np.sort(np.array([eval(i) for i in dict1.keys()]))
@@ -4243,7 +3447,6 @@ def order_two_level_dict(dict1):
                 dict_or[str(keyi)] = {}
                 dict_or[str(keyi)].update({str(keyj):dict1[str(keyi)][str(keyj)]})
     return dict_or
-
 
 def Freeion_charge_dist(theta, phi, A2, A4, A6, r=1, bin=1e-10):
     #Graphical representation and Discussion of the Charge Density
@@ -4288,7 +3491,6 @@ def coeff_multipole_moments(conf, J, M, L=0, S=0):
             coeff.append(value)
 
     return coeff
-
 
 #######READ FROM FILE########
 
@@ -4450,53 +3652,545 @@ def read_ee_int(conf, closed_shell):
         conf_n = almost_closed_shells(conf)
         conf_str = conf[0]+str(conf_n)
 
-    file = open('tables/f_electron_mod.dat').readlines()
-    check = False
-    dizionario = {}
+    file = open('tables/dic_ee_values.txt', 'r').readlines()
+    dic_ee_loaded = {}
+    conf = None
+    for line in file:
+        if line=='#':
+            conf = None
+        else:
+            splitline = line.split()
+            if len(splitline)==1:
+                conf = splitline[0].strip()
+                dic_ee_loaded[conf] = {}
+            else:
+                if splitline[0] not in dic_ee_loaded[conf].keys():
+                    dic_ee_loaded[conf][splitline[0]] = {}
+               
+                if splitline[0]!=splitline[1]:
+                    if splitline[1] not in dic_ee_loaded[conf].keys():
+                        dic_ee_loaded[conf][splitline[1]] = {}
+                    dic_ee_loaded[conf][splitline[1]].update({splitline[0]:np.array(splitline[2:], dtype=float)})
+                dic_ee_loaded[conf][splitline[0]].update({splitline[1]:np.array(splitline[2:], dtype=float)})
 
-    for i,line in enumerate(file):
-        if 'ELECTROSTATIC' in line:
-            line = line.replace('\n','')
-            nomi = line.split(' ')
-            dizionario[nomi[-1]] = {}
-            check = True
-            continue
-        elif check==True and 'ZZ' not in line and line != '\n':
-            line = line.replace('\n','')
-            splitline = line.split(' ')
-            term_string = []
-            for j in range(len(splitline)):
-                if splitline[j]!='':
-                    term_string.append(splitline[j])
-            #print(term_string)
-            try:
-                if len(term_string)==6:
-                    term1 = term_string[0]
-                    term2 = term_string[1]
+   
+    return dic_ee_loaded[conf_str]
+
+def calc_ee_int(conf, closed_shell=False):
+
+    if closed_shell==False:
+        conf_str = conf
+    else:
+        conf_n = almost_closed_shells(conf)
+        conf_str = conf[0]+str(conf_n)
+
+    import sympy
+
+    def calc_dic_ek(conf, dic_ek_out):
+
+        def omegaUL(U,L):
+            gU = {99:0,
+                10:6,
+                11:12,
+                20:14,
+                21:21,
+                30:24,
+                22:30,
+                31:32,
+                40:36}
+            return 1/2*state_legend(L)*(state_legend(L)+1) - gU[U]
+
+        S_list = [7/2, 3, 5/2, 5/2, 2, 2, 3/2, 3/2, 1, 1/2]
+        v_list = [7, 6, 5, 7, 4, 6, 5, 7, 6, 7]
+        Sv_list = [(S_list[i],v_list[i]) for i in range(len(S_list))]
+
+        AB_label = {'f5': {'2F':[6,7], '2H':[6,7], '2I':[4,5], '2K':[4,5]},
+                    'f6': {'3F':[8,9], '3H':[8,9], '3I':[5,6], '3K':[5,6], '1G':[7,8], '1I':[6,7], '1L':[3,4]},
+                    'f7': {'2F':[6,7], '2G':[9,0], '2H':[6,7], '2I':[4,5,8,9], '2K':[4,5], '2L':[4,5]}}
+
+        #W, U, U1
+        x_g = {200:
+                {20:{20:2}},  #questo è back calcolato da 1D1:1D1 sulla base delle tabelle di ryley
+               210:
+                {11:
+                {21:12*np.sqrt(455)},
+                20:
+                {20:-6/7, 21:6*np.sqrt(66)/7},
+                21:
+                {11:12*np.sqrt(455), 20:6*np.sqrt(66)/7, 21:[3/7, 0]}},
+               211:
+                {10:
+                {30:-20*np.sqrt(143)},
+                11:
+                {21:10*np.sqrt(182), 30:10},
+                20:
+                {20:-8/7, 21:4*np.sqrt(33)/7, 30:4*np.sqrt(3)},
+                21:
+                {11:10*np.sqrt(182), 20:4*np.sqrt(33)/7, 21:[4/7, 3], 30:2},
+                30:
+                {10:-20*np.sqrt(143), 11:10, 20:4*np.sqrt(3), 21:2, 30:2}},
+               220:
+                {20:
+                {20:3/14, 21:3*np.sqrt(55)/7, 22:-3*np.sqrt(5/28)},
+                21:
+                {20:3*np.sqrt(55)/7, 21:[-6/7,-3], 22:3/np.sqrt(7)},
+                22:
+                {20:-3*np.sqrt(5/28), 21:3/np.sqrt(7), 22:3/2}},
+               221:
+                {10:
+                {30:5*np.sqrt(143), 31:-15*np.sqrt(429)},
+                11:
+                {21:14*np.sqrt(910/11), 30:2*np.sqrt(10), 31:2*np.sqrt(39)/11},
+                20:
+                {20:2/7, 21:-10*np.sqrt(6)/7, 30:np.sqrt(3), 31:9*np.sqrt(3/7)},
+                21:
+                {11:14*np.sqrt(910/11), 20:-10*np.sqrt(6)/7, 21:[-1/7,12/11], 30: 5*np.sqrt(2/11), 31:3*np.sqrt(2)/11},
+                30:
+                {10: 5*np.sqrt(143), 11:2*np.sqrt(10), 20: np.sqrt(3), 21:5*np.sqrt(2/11), 30:-1/2, 31:3/(2*np.sqrt(11))},
+                31:
+                {10:-15*np.sqrt(429), 11:2*np.sqrt(39)/11, 20:9*np.sqrt(3/7), 21:3*np.sqrt(2)/11, 30:3/(2*np.sqrt(11)), 31:1/22}},
+               222:
+                {99:
+                {40:-30*np.sqrt(143)},
+                10:
+                {30:-3*np.sqrt(1430), 40:9*np.sqrt(1430)},
+                20:
+                {20:6/11, 30:-3*np.sqrt(42/11), 40:9*np.sqrt(2)/11},
+                30:
+                {10:-3*np.sqrt(1430), 20:-3*np.sqrt(42/11), 30:-3, 40:1/np.sqrt(11)},
+                40:
+                {99:-30*np.sqrt(143), 10:9*np.sqrt(1430), 20:9*np.sqrt(2)/11, 30:1/np.sqrt(11), 40:3/11}}}
+        #U1 L U
+        chi_L = {20:
+                {"D":{20:143},
+                "G":{20:-130},
+                "I":{20:35}},
+                21:
+                {"H":{11:1, 20:0, 21:[49,-75]},
+                "D":{20:-39*np.sqrt(2), 21:[377, 13]},
+                "F":{21:[455, -65]},
+                "G":{20:4*np.sqrt(65), 21:[-561, 55]},
+                "K":{21:[-315, 133]},
+                "L":{21:[245, -75]}},
+                30:
+                {"P":{11:-13*np.sqrt(11), 30:-52},
+                "F":{10:1, 21:12*np.sqrt(195), 30:38},
+                "G":{20:-13*np.sqrt(5), 21:8*np.sqrt(143), 30:-52},
+                "H":{11:np.sqrt(39), 21:11*np.sqrt(42), 30:88},
+                "I":{20:30, 30:25},
+                "K":{21:-4*np.sqrt(17), 30:-94},
+                "M":{30:25}},
+                22:
+                {"S":{22:260},
+                "D":{20:3*np.sqrt(429), 21:45*np.sqrt(78), 22:-25},
+                "G":{20:-38*np.sqrt(65), 21:12*np.sqrt(11), 22:94},
+                "H":{21:-12*np.sqrt(546), 22:104},
+                "I":{20:21*np.sqrt(85), 22:-181},
+                "L":{21:-8*np.sqrt(665), 22:-36},
+                "N":{22:40}},
+                31:
+                {"P":{11:11*np.sqrt(330), 30:76*np.sqrt(143), 31:-6644},
+                "D":{20:-8*np.sqrt(78), 21:-60*np.sqrt(39/7), 31:4792},
+                "F":{10:[0,1], 21:[-312*np.sqrt(5), 12*np.sqrt(715)], 30:[-48*np.sqrt(39), -98*np.sqrt(33)], 31:[4420, -902, 336*np.sqrt(143)]},
+                "G":{20:5*np.sqrt(65), 21:2024/np.sqrt(7), 30:20*np.sqrt(1001), 31:-2684},
+                "H":{11:[11*np.sqrt(85), -25*np.sqrt(77)], 21:[31*np.sqrt(1309/3), 103*np.sqrt(5/3)], 30:[-20*np.sqrt(374), -44*np.sqrt(70)], 31:[-2024,2680,-48*np.sqrt(6545)]},
+                "I":{20:[10*np.sqrt(21),0], 30:[-57*np.sqrt(33), 18*np.sqrt(1122)], 31:[-12661/5,17336/5,-3366*np.sqrt(34)/5]},
+                "K":{21:[-52*np.sqrt(323/23), -336*np.sqrt(66/23)], 30:[-494*np.sqrt(19/23), 73*np.sqrt(1122/23)], 31:[123506/23, -85096/23, 144*np.sqrt(21318)/23]},
+                "L":{21:-24*np.sqrt(190), 31:-4712},
+                "M":{30:-21*np.sqrt(385), 31:-473},
+                "N":{31:1672},
+                "O":{31:220}},
+                40:
+                {"S":{99:1, 40:-1408},
+                "D":{20:-88*np.sqrt(13), 40:-44},
+                "F":{10:1, 30:90*np.sqrt(11), 40:1078},
+                "G":{20:[53*np.sqrt(715/27), 7*np.sqrt(15470/27)], 30:[-16*np.sqrt(1001), 64*np.sqrt(442)], 40:[-16720/9, 10942/9, -34*np.sqrt(2618)/9]},
+                "H":{30:-72*np.sqrt(462), 40:-704},
+                "I":{20:[34*np.sqrt(1045/31), -12*np.sqrt(1785/31)], 30:[-9*np.sqrt(21945/31), 756*np.sqrt(85/31)], 40:[-2453/31, 36088/31, 60*np.sqrt(74613)/31]},
+                "K":{30:-84*np.sqrt(33), 40:-132},
+                "L":{40:[-4268/31, 11770/31, 924*np.sqrt(1995)/31]},
+                "M":{30:-99*np.sqrt(15), 40:-1067},
+                "N":{40:528},
+                "Q":{40:22}}}
+        #U1 L U
+        phi_L = {11:
+                {"P":{11:-11},
+                "H":{11:3}},
+                20:
+                {"D":{20:-11},
+                "G":{20:-4},
+                "I":{20:7}},
+                21:
+                {"D":{20:6*np.sqrt(2), 21:-57},
+                "F":{10:1, 21:63},
+                "G":{20:np.sqrt(65), 21:55},
+                "H":{21:-105},
+                "K":{21:-14},
+                "L":{21:42}},
+                30:
+                {"P":{11:np.sqrt(11), 30:83},
+                "F":{21:np.sqrt(195), 30:-72},
+                "G":{20:2*np.sqrt(5), 21:-np.sqrt(143), 30:20},
+                "H":{11:np.sqrt(39), 21:-2*np.sqrt(42), 30:-15},
+                "I":{20:3, 30:42},
+                "K":{21:-4*np.sqrt(17), 30:-28},
+                "M":{30:6}},
+                22:
+                {"S":{99:1, 22:144},
+                "D":{20:3*np.sqrt(429), 22:69},
+                "G":{20:4*np.sqrt(65), 22:-148},
+                "H":{22:72},
+                "I":{20:3*np.sqrt(85), 22:39},
+                "L":{22:-96},
+                "N":{22:56}},
+                31:
+                {"P":{11:np.sqrt(330), 30:17*np.sqrt(143), 31:209},
+                "D":{21:12*np.sqrt(273), 31:-200},
+                "F":{10:[1,0], 21:[-36*np.sqrt(5), -3*np.sqrt(715)], 30:[-16*np.sqrt(39), 24*np.sqrt(33)], 31:[624, -616, -80*np.sqrt(143)]},
+                "G":{21:11*np.sqrt(7), 30:4*np.sqrt(1001), 31:836},
+                "H":{11:[np.sqrt(85), np.sqrt(77)], 21:[-2*np.sqrt(1309/3), -74*np.sqrt(5/3)], 30:[np.sqrt(187/2), 31*np.sqrt(35/2)], 31:[-1353/2, 703/2, -5*np.sqrt(6545)/2]},
+                "I":{30:[30*np.sqrt(33), 0], 31:[-2662/5, -88/5, 528*np.sqrt(34)/5]},
+                "K":{21:[-28*np.sqrt(323/23), 42*np.sqrt(66/23)], 30:[4*np.sqrt(437),0], 31:[6652/23, -5456/23, 96*np.sqrt(21318)/23]},
+                "L":{21:-6*np.sqrt(190), 31:-464},
+                "M":{30:-6*np.sqrt(385), 31:814},
+                "N":{31:-616},
+                "O":{31:352}},
+                40:
+                {"S":{22:2*np.sqrt(2145)},
+                "D":{20:11*np.sqrt(13), 21:-6*np.sqrt(26), 22:9*np.sqrt(33)},
+                "F":{21:3*np.sqrt(455)},
+                "G":{20:[-4*np.sqrt(715/27),np.sqrt(15470/27)], 21:[-131*np.sqrt(11/27), 17*np.sqrt(238/27)], 22:[-4*np.sqrt(11/27), -17*np.sqrt(238/27)]},
+                "H":{21:-12*np.sqrt(21), 22:3*np.sqrt(286)},
+                "I":{20:[7*np.sqrt(1045/31),3*np.sqrt(1785/31)], 22:[3*np.sqrt(3553/31),75*np.sqrt(21/31)]},
+                "K":{21:-2*np.sqrt(119)},
+                "L":{21:[22*np.sqrt(105/31), -84*np.sqrt(19/31)], 22:[4*np.sqrt(627/31), 12*np.sqrt(385/31)]},
+                "N":{22:-np.sqrt(2530)}}}
+        #conf v:(2*S+1):U v1:(2*S1+1):U1
+        y_g = {"f3":
+                {"1:2:10":{"3:2:21":-6*np.sqrt(22)},
+                "3:2:11":{"3:2:11":2},
+                "3:2:20":{"3:2:20":10/7, "3:2:21":2*np.sqrt(66)/7},
+                "3:2:21":{"3:2:20":2*np.sqrt(66)/7, "3:2:21":2/7}},
+                "f4":
+                {"2:3:10":{"4:3:21":-12*np.sqrt(33/5)},
+                "2:3:11":{"4:3:11":6/5, "4:3:30":6},
+                "4:3:10":{"4:3:21":8*np.sqrt(11/15)},
+                "4:3:11":{"4:3:11":29/15,"4:3:30":-1/3},
+                "4:3:20":{"4:3:20":6/7, "4:3:21":-8*np.sqrt(11/147), "4:3:30":4/np.sqrt(3)},
+                "4:3:21":{"4:3:10":8*np.sqrt(11/15), "4:3:20":-8*np.sqrt(11/147), "4:3:21":-2/21, "4:3:30":-4/3},
+                "4:3:30":{"4:3:11":-1/3, "4:3:20":4/np.sqrt(3), "4:3:21":-4/3, "4:3:30":1/3},
+                "0:1:99":{"4:1:22":-12*np.sqrt(22)},
+                "2:1:20":{"4:1:20":3*np.sqrt(3/175), "4:1:21":-4*np.sqrt(33/35), "4:1:22":-np.sqrt(3/5)},
+                "4:1:20":{"4:1:20":221/140, "4:1:21":8*np.sqrt(11/245), "4:1:22":-np.sqrt(7/80)},
+                "4:1:21":{"4:1:20":8*np.sqrt(11/245), "4:1:21":2/7},
+                "4:1:22":{"4:1:20":-np.sqrt(7/80), "4:1:22":1/4}},
+                "f5":
+                {"3:4:10":{"5:4:21":9*np.sqrt(11)},
+                "3:4:20":{"5:4:20":3/np.sqrt(7), "5:4:21":np.sqrt(33/7), "5:4:30":-2*np.sqrt(21)},
+                "5:4:10":{"5:4:21":-np.sqrt(55/3)},
+                "5:4:11":{"5:4:11":-1/3, "5:4:30":-5/3},
+                "5:4:20":{"5:4:20":5/7, "5:4:21":5*np.sqrt(11/147), "5:4:30":2/np.sqrt(3)},
+                "5:4:21":{"5:4:10":-np.sqrt(55/3), "5:4:20":5*np.sqrt(11/147), "5:4:21":-4/21, "5:4:30":-2/3},
+                "5:4:30":{"5:4:11":-5/3, "5:4:20":2/np.sqrt(3), "5:4:21":-2/3, "5:4:30":-1/3},
+                "1:2:10":{"5:2:21":36/np.sqrt(5), "5:2:31":-36*np.sqrt(2)},
+                "3:2:11":{"5:2:11":3/np.sqrt(2), "5:2:30":3*np.sqrt(5)/2, "5:2:31":-np.sqrt(39/8)},
+                "3:2:20":{"5:2:20":3/7, "5:2:21":-11*np.sqrt(6)/7, "5:2:30":-4*np.sqrt(3)},
+                "3:2:21":{"5:2:10":3*np.sqrt(33/10), "5:2:20":-3*np.sqrt(33/98), "5:2:21":3/(7*np.sqrt(11)), "5:2:30":-3/(2*np.sqrt(2)), "5:2:31":3/(2*np.sqrt(22))},
+                "5:2:10":{"5:2:21":43/np.sqrt(30), "5:2:31":4*np.sqrt(3)},
+                "5:2:11":{"5:2:11":-5/6, "5:2:30":-5*np.sqrt(5/72), "5:2:31":-np.sqrt(13/48)},
+                "5:2:20":{"5:2:20":11/7, "5:2:21":-11/(7*np.sqrt(6)), "5:2:30":4/np.sqrt(3)},
+                "5:2:21":{"5:2:10":43/np.sqrt(30), "5:2:20":-11/(7*np.sqrt(6)), "5:2:21":25/231, "5:2:30":29/(6*np.sqrt(22)), "5:2:31":1/(22*np.sqrt(2))},
+                "5:2:30":{"5:2:11":-5*np.sqrt(5/72), "5:2:20":4/np.sqrt(3), "5:2:21":29/(6*np.sqrt(22)), "5:2:30":-1/12, "5:2:31":1/(4*np.sqrt(11))},
+                "5:2:31":{"5:2:10":4*np.sqrt(3), "5:2:11":-np.sqrt(13/48), "5:2:21":1/(22*np.sqrt(2)), "5:2:30":1/(4*np.sqrt(11)), "5:2:31":1/44}},
+                "f6":
+                {"4:5:10":{"6:5:21":-6*np.sqrt(11)},
+                "4:5:20":{"6:5:20":-2*np.sqrt(2/7), "6:5:21":2*np.sqrt(33/7)},
+                "2:3:10":{"6:3:21":-48*np.sqrt(2/5), "6:3:31":-36},
+                "2:3:11":{"6:3:11":np.sqrt(6/5), "6:3:30":np.sqrt(3), "6:3:31":3*np.sqrt(13/10)},
+                "4:3:10":{"6:3:21":46/np.sqrt(15), "6:3:31":-8*np.sqrt(6)},
+                "4:3:11":{"6:3:11":11/(3*np.sqrt(5)), "6:3:30":-19/(3*np.sqrt(2)), "6:3:31":np.sqrt(13/60)},
+                "4:3:20":{"6:3:20":-6*np.sqrt(2)/7, "6:3:21":-22/(7*np.sqrt(3)), "6:3:30":8*np.sqrt(2/3)},
+                "4:3:21":{"6:3:10":-np.sqrt(110/3), "6:3:20":np.sqrt(22/147), "6:3:21":-16/(21*np.sqrt(11)), "6:3:30":5/(3*np.sqrt(2)), "6:3:31":1/np.sqrt(22)},
+                "4:3:30":{"6:3:11":-np.sqrt(5)/3, "6:3:20":4*np.sqrt(2/3), "6:3:21":4/(3*np.sqrt(11)), "6:3:30":1/(3*np.sqrt(2)), "6:3:31":-1/np.sqrt(22)},
+                "2:1:20":{"6:1:20":6/np.sqrt(55), "6:1:30":2*np.sqrt(42/5), "6:1:40":6*np.sqrt(2/55)},
+                "4:1:20":{"6:1:20":-61/np.sqrt(770), "6:1:30":8*np.sqrt(3/5), "6:1:40":-6/np.sqrt(385)},
+                "4:1:21":{"6:1:10":3*np.sqrt(22), "6:1:20":np.sqrt(2/7), "6:1:30":-np.sqrt(3), "6:1:40":1/np.sqrt(7)},
+                "4:1:22":{"6:1:99":-4*np.sqrt(33/5), "6:1:20":-1/np.sqrt(22), "6:1:40":2/np.sqrt(11)}},
+                "f7":
+                {"3:4:99":{"7:4:22":-12*np.sqrt(11)},
+                "3:4:10":{"7:4:21":6*np.sqrt(33)},
+                "3:4:20":{"7:4:20":-np.sqrt(5/7), "7:4:21":2*np.sqrt(11/7), "7:4:22":-1},
+                "3:2:11":{"7:2:30":2*np.sqrt(10)},
+                "3:2:20":{"7:2:20":-16/np.sqrt(77), "7:2:30":-2*np.sqrt(6), "7:2:40":6*np.sqrt(2/77)},
+                "3:2:21":{"7:2:10":-np.sqrt(66), "7:2:20":np.sqrt(6/7), "7:2:30":1, "7:2:40":np.sqrt(3/7)}}}
+
+        def calc_ek(conf, label1, label2, S, L, dic_ek): 
+
+            #dic_ek [label1:n:v:U:2S+1:L][label2:n:v1:U1:2S+1:L] 
+            v,W,U = terms_labels_symm(conf)[label1]
+            v1,W1,U1 = terms_labels_symm(conf)[label2]
+
+            ek_coeff = np.zeros(4)
+            n = int(conf[1:]) 
+            if label1==label2:
+                ek_coeff[0] = n*(n-1)/2 
+                ek_coeff[1] = 9*(n - v)/2 + 1/4*v*(v+2) - S*(S+1)
+
+            if v==v1:
+
+                if v!=2*S and W==W1 and int(str(W)[0])==2:
+                    factor1 = x_g.get(W, {}).get(U, {}).get(U1)
+                    if factor1 is None: 
+                        factor1 = x_g.get(W, {}).get(U1, {}).get(U)
+                    factor2 = chi_L.get(U1, {}).get(L, {}).get(U)
+                    if factor2 is None:  
+                        factor2 = chi_L.get(U, {}).get(L, {}).get(U1)
+                    if factor1 is not None and factor2 is not None:
+                        if (isinstance(factor1, float) or isinstance(factor1, int)) and (isinstance(factor2, float) or isinstance(factor2, int)):
+                            ek_coeff[2] = factor1*factor2
+                        elif (isinstance(factor1, float) or isinstance(factor1, int)) and isinstance(factor2, list):
+                            idx = 1
+                            try:       
+                                if AB_label[conf][label1[:2]].index(int(label1[-1]))%2==0:
+                                    idx = 0
+                            except KeyError:
+                                if AB_label[conf][label2[:2]].index(int(label2[-1]))%2==0:
+                                    idx = 0
+                            if label1!=label2 and v==v1 and U==U1 and W==W1:
+                                idx = -1
+                            ek_coeff[2] = factor2[idx]*factor1
+                        else:
+                            ek_coeff[2] = np.sum(np.array(factor1)*np.array(factor2))
+                        
+                    if (S,v) in Sv_list:
+                        ek_coeff[2] *= -1
+                    
+                if n==2*S and U1==U:
+                    ek_coeff[3] = -3*omegaUL(U,L)+omegaUL(U,L)  #I'll remove it later
+                if v==n and (v==6 or v==7):
+                    ek_coeff[3] = 0
+                key1 = ':'.join([label1,str(v),str(v),str(U),str(int(2*S+1)),L])
+                key2 = ':'.join([label2,str(v),str(v),str(U1),str(int(2*S+1)),L])
+                key1_cut = ':'.join([label1[:2],str(v),str(v),str(U),str(int(2*S+1)),L])
+                key2_cut = ':'.join([label2[:2],str(v),str(v),str(U1),str(int(2*S+1)),L])
+
+                if dic_ek['f'+str(v)].get(key1, {}).get(key2) is not None:
+                    prev_int = dic_ek['f'+str(v)][key1][key2][3].copy()
+                    if U1==U and label1==label2:
+                        prev_int += omegaUL(U,L)
+                    if n==v+2:
+                        ek_coeff[3] = prev_int*(1-v)/(7-v)
+                    elif n==v+4:
+                        ek_coeff[3] = prev_int*(-4)/(7-v)
+                elif dic_ek['f'+str(v)].get(key1_cut, {}).get(key2_cut) is not None:
+                    prev_int = dic_ek['f'+str(v)][key1_cut][key2_cut][3].copy()
+                    if U1==U and label1==label2:
+                        prev_int += omegaUL(U,L)
+                    if n==v+2:
+                        ek_coeff[3] = prev_int*(1-v)/(7-v)
+                    elif n==v+4:
+                        ek_coeff[3] = prev_int*(-4)/(7-v)
+                        
+            else:
+
+                if n==5 and ((v,v1)==(1,3) or (v1,v)==(1,3)) and (2*S+1)==2:
+                    key1 = ':'.join([label1,'3',str(v),str(U),str(int(2*S+1)),L])
+                    key2 = ':'.join([label2,'3',str(v1),str(U1),str(int(2*S+1)),L])
+                    if dic_ek['f3'].get(key1, {}).get(key2) is not None:
+                        ek_coeff[3] = dic_ek['f3'][key1][key2][3]*np.sqrt(2/5)
+                    elif dic_ek['f3'].get(key2, {}).get(key1) is not None:
+                        ek_coeff[3] = dic_ek['f3'][key2][key1][3]*np.sqrt(2/5)
+                if n==6 and ((v,v1)==(0,4) or (v,v1)==(4,0)) and (2*S+1)==1:
+                    key1 = ':'.join([label1,'4',str(v),str(U),str(int(2*S+1)),L])
+                    key2 = ':'.join([label2,'4',str(v1),str(U1),str(int(2*S+1)),L])
+                    if dic_ek['f4'].get(key1, {}).get(key2) is not None:
+                        ek_coeff[3] = dic_ek['f4'][key1][key2][3]*np.sqrt(9/5)
+                    elif dic_ek['f4'].get(key2, {}).get(key1) is not None:
+                        ek_coeff[3] = dic_ek['f4'][key2][key1][3]*np.sqrt(9/5)
+                if n==6 and ((v,v1)==(2,4) or (v,v1)==(4,2)):
+                    key1 = ':'.join([label1,'4',str(v),str(U),str(int(2*S+1)),L])
+                    key2 = ':'.join([label2,'4',str(v1),str(U1),str(int(2*S+1)),L])
+                    if dic_ek['f4'].get(key1, {}).get(key2) is not None:
+                        ek_coeff[3] = dic_ek['f4'][key1][key2][3]*np.sqrt(1/6)
+                    elif dic_ek['f4'].get(key2, {}).get(key1) is not None:
+                        ek_coeff[3] = dic_ek['f4'][key2][key1][3]*np.sqrt(1/6)
+                if n==7 and ((v,v1)==(1,5) or (v,v1)==(5,1)) and (2*S+1)==2:
+                    key1 = ':'.join([label1,'5',str(v),str(U),str(int(2*S+1)),L])
+                    key2 = ':'.join([label2,'5',str(v1),str(U1),str(int(2*S+1)),L])
+                    if dic_ek['f5'].get(key1, {}).get(key2) is not None:
+                        ek_coeff[3] = dic_ek['f5'][key1][key2][3]*np.sqrt(3/2)
+                    elif dic_ek['f5'].get(key2, {}).get(key1) is not None:
+                        ek_coeff[3] = dic_ek['f5'][key2][key1][3]*np.sqrt(3/2)
+
+            key1 = ':'.join([str(v),str(int(2*S+1)),str(U)])
+            key2 = ':'.join([str(v1),str(int(2*S+1)),str(U1)])
+            factor1 = y_g.get(conf, {}).get(key1, {}).get(key2)
+            if factor1 is None: 
+                factor1 = y_g.get(conf, {}).get(key2, {}).get(key1)
+            factor2 = phi_L.get(U1, {}).get(L, {}).get(U)
+            if factor2 is None:  
+                factor2 = phi_L.get(U, {}).get(L, {}).get(U1)
+            if factor1 is not None and factor2 is not None:
+                if (isinstance(factor1, float) or isinstance(factor1, int)) and (isinstance(factor2, float) or isinstance(factor2, int)):
+                    ek_coeff[3] = factor1*factor2
                 else:
-                    term2 = term_string[0]
-                numero = [term_string[ii] for ii in range(len(term_string)) if term_string[ii]!=term1 and term_string[ii]!=term2]
-            except:
-                if len(term_string)==3:
-                    term1 = term_string[0]
-                    term2 = term_string[1]
-                else:
-                    term2 = term_string[0]
-                numero = [0]
-            try:
-                dizionario[nomi[-1]][term1].update({term2:numero})
-            except:
-                dizionario[nomi[-1]][term1] = {}
-                dizionario[nomi[-1]][term1].update({term2:numero})
-        elif 'MATRIX FOR' in line or 'ZZ' in line:
-            check=False
+                    idx = 1
+                    try:       
+                        if AB_label[conf][label1[:2]].index(int(label1[-1]))%2==0:
+                            idx = 0
+                    except KeyError:
+                        if AB_label[conf][label2[:2]].index(int(label2[-1]))%2==0:
+                            idx = 0
+                    if label1!=label2 and v==v1 and U==U1 and W==W1:
+                        idx = -1
 
-    return dizionario[conf_str]
+                    ek_coeff[3] = factor2[idx]*factor1
 
+            if U1==U and v1==v and label1==label2:
+                ek_coeff[3] -= omegaUL(U,L)
+
+            key1 = ':'.join([label1,str(n),str(v),str(U),str(int(2*S+1)),L])
+            key2 = ':'.join([label2,str(n),str(v1),str(U1),str(int(2*S+1)),L])
+            if key1 not in dic_ek[conf].keys():
+                dic_ek[conf][key1] = {}
+            if key2 not in dic_ek[conf].keys():
+                dic_ek[conf][key2] = {}
+            else:
+                if key2 not in dic_ek[conf][key1].keys():
+                    dic_ek[conf][key1][key2] = ek_coeff
+                    dic_ek[conf][key2][key1] = ek_coeff
+
+            return dic_ek 
+
+        calc = calculation(conf, TAB=True, wordy=False)
+        basis = calc.basis
+        dic_ek_out[conf] = {}
+        labels_list = []
+        for i in range(basis.shape[0]):
+            statei = basis[i]
+            Si = statei[0]/2.
+            Li = statei[1]
+            Ji = statei[2]/2.
+            MJi = statei[3]/2.
+            seni = statei[-1]
+            labeli = calc.dic_LS[':'.join([f'{qq}' for qq in statei])]
+
+            for j in range(0,i+1):
+                statej = basis[j]
+                Sj = statej[0]/2.
+                Lj = statej[1]
+                Jj = statej[2]/2.
+                MJj = statej[3]/2.
+                senj = statej[-1]
+                labelj = calc.dic_LS[':'.join([f'{qq}' for qq in statej])]
+
+                if Ji==Jj and MJi==MJj and Li == Lj and Si == Sj:
+                    if labeli+':'+labelj not in labels_list and labelj+':'+labeli not in labels_list:
+                        labels_list.append(labeli+':'+labelj)
+                        dic_ek_out = calc_ek(conf, labeli, labelj, Si, state_legend(str(Li), inv=True), dic_ek_out)
+                
+
+        return dic_ek_out
+
+    def calc_ee_int(conf, label, label1, S, L, dic_ek):
+
+        n = int(conf[1:])
+        v,W,U = terms_labels_symm(conf)[label]
+        v1,W1,U1 = terms_labels_symm(conf)[label1]
+        key1 = ':'.join([label,str(n),str(v),str(U),str(int(2*S+1)),L])
+        key2 = ':'.join([label1,str(n),str(v1),str(U1),str(int(2*S+1)),L])
+        ek_coeff = dic_ek[key1][key2]
+
+        F0, F2, F4, F6 = sympy.Symbol("F0, F2, F4, F6")
+        coeff = [F0, F2, F4, F6]  
+
+        Ek_coeff = []
+        Ek_coeff.append(coeff[0] - 10/225*coeff[1] - 33/1089*coeff[2] - 286*25/184041*coeff[3])
+        Ek_coeff.append(1/9*(70/225*coeff[1] + 231/1089*coeff[2] + 2002*25/184041*coeff[3]))
+        Ek_coeff.append(1/9*(1/225*coeff[1] - 3/1089*coeff[2] + 7*25/184041*coeff[3]))
+        Ek_coeff.append(1/3*(5/225*coeff[1] + 6/1089*coeff[2] - 91*25/184041*coeff[3]))
+
+        ee_int = sympy.simplify(Ek_coeff[0]*ek_coeff[0] + Ek_coeff[1]*ek_coeff[1] + Ek_coeff[2]*ek_coeff[2] + Ek_coeff[3]*ek_coeff[3])
+
+        return ee_int, ek_coeff
+
+    #create the dictionry with e-e interaction
+    conf_list = ['f3', 'f4', 'f5', 'f6', 'f7']
+    dic_ek_conf = {'f0':{},
+                   'f1':{},
+                   'f2':
+                   {'3P:2:2:11:3:P':{'3P:2:2:11:3:P':np.array([0,0,0,22+11])},
+                   '3F:2:2:10:3:F':{'3F:2:2:10:3:F':np.array([0,0,0,0])},
+                   '3H:2:2:11:3:H':{'3H:2:2:11:3:H':np.array([0,0,0,-6-3])},
+                   '1S:2:0:99:1:S':{'1S:2:0:99:1:S':np.array([0,0,0,0])},
+                   '1D:2:2:20:1:D':{'1D:2:2:20:1:D':np.array([0,0,0,-22+11])},
+                   '1G:2:2:20:1:G':{'1G:2:2:20:1:G':np.array([0,0,0,-8+4])},
+                   '1I:2:2:20:1:I':{'1I:2:2:20:1:I':np.array([0,0,0,14-7])}}}
+    
+    dic_ee_expr = {}
+    dic_ee_values = {}
+
+    for conf in conf_list:
+
+        dic_ek_conf = calc_dic_ek(conf, dic_ek_conf)
+        dic_ee_expr[conf] = {}
+        dic_ee_values[conf] = {}
+
+        calc = calculation(conf, TAB=True, wordy=False)
+        basis = calc.basis
+        for i in range(basis.shape[0]):
+            statei = basis[i]
+            Si = statei[0]/2.
+            Li = statei[1]
+            Ji = statei[2]/2.
+            MJi = statei[3]/2.
+            labeli = calc.dic_LS[':'.join([f'{qq}' for qq in statei])]
+
+            for j in range(0,i+1):
+                statej = basis[j]
+                Sj = statej[0]/2.
+                Lj = statej[1]
+                Jj = statej[2]/2.
+                MJj = statej[3]/2.
+                labelj = calc.dic_LS[':'.join([f'{qq}' for qq in statej])]
+
+                if Ji==Jj and MJi==MJj and Li == Lj and Si == Sj:
+                    ee_value, ee_c = calc_ee_int(conf, labeli, labelj, Si, state_legend(str(Li), inv=True), dic_ek_conf[conf])
+                    dic_ee_expr[conf][labeli+':'+labelj] = ee_value
+                    dic_ee_values[conf][labeli+':'+labelj] = ee_c
+                    if labeli!=labelj:
+                        dic_ee_expr[conf][labelj+':'+labeli] = ee_value
+                        dic_ee_values[conf][labelj+':'+labeli] = ee_c
+
+    return dic_ee_expr[conf_str], dic_ee_values[conf_str]
 
 #--------------------------------------------------#
 #           TABLES, LEGENDS & CONVENTIONS          #
 #--------------------------------------------------#
+
+def rotate_vectors(vectors, angle, axis):
+    """
+    Rotate Cartesian vectors with respect to one of the x, y, or z axes.
+
+    Parameters:
+    vectors (np.ndarray): Array of shape (N, 3) representing N Cartesian vectors.
+    angle (float): Rotation angle in radians.
+    axis (str): Axis of rotation ('x', 'y', or 'z').
+
+    Returns:
+    np.ndarray: Array of rotated vectors of shape (N, 3).
+    """
+    if axis == 'x':
+        r = scipy.spatial.transform.Rotation.from_euler('x', angle, degrees=False)
+    elif axis == 'y':
+        r = scipy.spatial.transform.Rotation.from_euler('y', angle, degrees=False)
+    elif axis == 'z':
+        r = scipy.spatial.transform.Rotation.from_euler('z', angle, degrees=False)
+    else:
+        raise ValueError("Axis must be 'x', 'y', or 'z'")
+
+    rotated_vectors = r.apply(vectors)
+    return rotated_vectors
 
 def points_on_sphere(num_pts=100, figure=False, angles=False):
     #golden spiral method (https://stackoverflow.com/questions/9600801/evenly-distributing-n-points-on-a-sphere)
@@ -5883,7 +5577,6 @@ def rotate_dicV(dic, l, rotangle_V=False, real=True, return_orcaV = False):
 
     return dic_rot
     
-
 def U_complex2real(l):
     # order: ... -3, -2, -1, 0, 1, 2, 3 ...
     dim = 2*l + 1
@@ -6017,7 +5710,6 @@ def from_Vint_to_Bkq_2(l, dic_, reverse=False):
                 count += 1
 
         return dic_V
-
 
 def Rzyz_active(alpha=0,beta=0,gamma=0):
     #proper-euler angles
