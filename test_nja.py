@@ -1827,7 +1827,7 @@ def test_tables_d():
 @test
 def test_energy_allconf_f():
 
-    conf_list = ['f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12', 'f13']
+    conf_list = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12', 'f13']
     data = nja.read_data('test/beta.inp', sph_flag = False)
     data[:,-1] *= -1
     
@@ -1851,7 +1851,7 @@ def test_energy_allconf_f():
                 try:
                     assert round(matrix[i,j].real, 6) == round(check_R[count], 6)
                     assert round(matrix[i,j].imag, 6) == round(check_I[count], 6)
-                except AssertionError:
+                except AssertionError:  #the only elements that are actually different are those that involve 1K
                     print(label_matrix[i], label_matrix[j])
                     print('i,j',i,j)
                     print('matrix',matrix[i,j])
@@ -2724,36 +2724,36 @@ def test_reduction():
 if __name__ == '__main__':
 
     #### test graphical representations
-    # test_plot_Ediagram()
-    # test_plot_Ediagram_PCM()
-    # test_CF_splitting()
-    # test_TanabeSugano()
-    # test_plot_magnetization_field()
+    test_plot_Ediagram()
+    test_plot_Ediagram_PCM()
+    test_CF_splitting()
+    test_TanabeSugano()
+    test_plot_magnetization_field()
 
     #### actual tests
-    # test_energy_allconf_d()     #d2, d3, d4, d5, d6, d7, d8, d9
-    # test_tables_d()
+    test_energy_allconf_d()     #d2, d3, d4, d5, d6, d7, d8, d9
+    test_tables_d()
     test_energy_allconf_f()     #f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13 (takes 3:30 h with clean ram)
-    # test_tables_f()
-    # test_conv_AqkrkBkq() #f11
-    # test_PCM() #f9
-    # test_PCM_2() #f10
-    # test_StevensfromMOLCAS #f9
-    # test_Wigner_Euler_quat()
-    # test_Wigner_Euler_quat2()
-    # test_LF_rotation_euler()
-    # test_LF_rotation_quat()
-    # test_mag_moment()  #d1
-    # test_mag_moment2()  #f9
-    # test_M_vector()  #d3
-    # test_M_vector2()  #d9
-    # test_gtensor()  #f13
-    # test_susceptibility_B_ord1()  #d8
-    # test_susceptibility_B_ord1_2()  #d8
-    # test_susceptibility_B_ord1_3()  #f9
-    # test_susceptibility_B_ord1_4()  #f2
-    # test_calc_susceptibility_zerofield()  #d8
-    # test_torque()
+    test_tables_f()
+    test_conv_AqkrkBkq() #f11
+    test_PCM() #f9
+    test_PCM_2() #f10
+    test_StevensfromMOLCAS #f9
+    test_Wigner_Euler_quat()
+    test_Wigner_Euler_quat2()
+    test_LF_rotation_euler()
+    test_LF_rotation_quat()
+    test_mag_moment()  #d1
+    test_mag_moment2()  #f9
+    test_M_vector()  #d3
+    test_M_vector2()  #d9
+    test_gtensor()  #f13
+    test_susceptibility_B_ord1()  #d8
+    test_susceptibility_B_ord1_2()  #d8
+    test_susceptibility_B_ord1_3()  #f9
+    test_susceptibility_B_ord1_4()  #f2
+    test_calc_susceptibility_zerofield()  #d8
+    test_torque()
 
     #### on development
     # test_reduction()
