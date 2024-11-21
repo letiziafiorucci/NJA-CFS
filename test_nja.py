@@ -13,6 +13,7 @@ from pprint import pprint
 import matplotlib.pyplot as plt
 import sympy
 import copy
+import crystdat
 
 ##############
 class color_term:
@@ -48,6 +49,7 @@ def test(func):
             print('Execution time: {}'.format(end_time - start_time))
     return wrapper
 
+@test
 def test_CF_splitting():
 
     def plot_energy_levels(eigenvalues, ax=None, color='b', label=None, tolerance=0.05, offset=0, delta=0):
@@ -154,13 +156,14 @@ def test_CF_splitting():
 
     plt.show()
 
+@test
 def test_plot_Ediagram():
 
     conf = 'd8'
-    calc = nja.calculation(conf, TAB=False, wordy=True)
+    calc = nja.calculation(conf, TAB=False, wordy=False)
     basis, dic_LS, basis_l, basis_l_JM = nja.Full_basis(conf)
 
-    dic_orca = nja.read_AILFT_orca6('test/calcsuscenisalfix.out', conf, method='CASSCF', return_V=False, rotangle_V=False, print_orcamatrix=False)
+    dic_orca = nja.read_AILFT_orca6('test/calcsuscenisalfix.out', conf, method='CASSCF', return_V=False, rotangle_V=False, return_orcamatrix=False)
 
     contributes = ['Hee', 'Hcf', 'Hso']
     theories = ['Hee', 'Hee + Hcf', 'Hee + Hcf + Hso']
@@ -171,7 +174,7 @@ def test_plot_Ediagram():
     prev = np.zeros((basis.shape[0]+1,basis.shape[0]), dtype='complex128')
     for i in range(len(contributes)):
         list_contr.append(contributes[i])
-        result = calc.MatrixH(list_contr, **dic_orca, field=[0.0,0.0,28.0], evaluation=True, wordy=True, ground_proj=False, return_proj=False)
+        result = calc.MatrixH(list_contr, **dic_orca, field=[0.0,0.0,28.0], wordy=False, ground_proj=False, return_proj=False)
         if i==0:
             E0 = np.min(result[0,:].real)
         result[0,:] = result[0,:].real-E0
@@ -185,7 +188,7 @@ def test_plot_Ediagram():
             proj_prev = nja.projection(result[1:,:], basis_l, prev[1:,:], prev[0,:].real)
             proj_prev_dict[theories[i]] = proj_prev
 
-        E_matrix.append([round(result[0,ii].real,3) for ii in range(result.shape[-1])])  #tengo fino alla terza decimale
+        E_matrix.append([round(result[0,ii].real,3) for ii in range(result.shape[-1])])  
 
         prev = result.copy()
 
@@ -194,10 +197,11 @@ def test_plot_Ediagram():
     #plot energy levels
     nja.level_fig_tot(E_matrix, theories, proj_LS_dict, proj_prev_dict)
 
+@test
 def test_plot_Ediagram_PCM():
 
     conf = 'f12'
-    calc = nja.calculation(conf, TAB=False, wordy=True)
+    calc = nja.calculation(conf, TAB=False, wordy=False)
     basis, _, basis_l, _ = nja.Full_basis(conf)
 
     data = nja.read_data('test/beta.inp', sph_flag = False)
@@ -215,7 +219,7 @@ def test_plot_Ediagram_PCM():
     prev = np.zeros((basis.shape[0]+1,basis.shape[0]), dtype='complex128')
     for i in range(len(contributes)):
         list_contr.append(contributes[i])
-        result = calc.MatrixH(list_contr, **dic_PCM, field=[0.0,0.0,28.0], evaluation=True, wordy=True, ground_proj=False, return_proj=False)
+        result = calc.MatrixH(list_contr, **dic_PCM, field=[0.0,0.0,28.0], wordy=False, ground_proj=False, return_proj=False)
         if i==0:
             E0 = np.min(result[0,:].real)
         result[0,:] = result[0,:].real-E0
@@ -229,7 +233,7 @@ def test_plot_Ediagram_PCM():
             proj_prev = nja.projection(result[1:,:], basis_l, prev[1:,:], prev[0,:].real)
             proj_prev_dict[theories[i]] = proj_prev
 
-        E_matrix.append([round(result[0,ii].real,3) for ii in range(result.shape[-1])])  #tengo fino alla terza decimale
+        E_matrix.append([round(result[0,ii].real,3) for ii in range(result.shape[-1])])  
 
         prev = result.copy()
 
@@ -238,6 +242,7 @@ def test_plot_Ediagram_PCM():
     #plot energy levels
     nja.level_fig_tot(E_matrix, theories, proj_LS_dict, proj_prev_dict)
 
+@test
 def test_PCM_from_Bkq():
 
     #turned out it is not possible ... 
@@ -353,6 +358,7 @@ def test_PCM_from_Bkq():
     dic_Bkq = nja.from_Aqkrk_to_Bkq(dic_CF)
     pprint(dic_Bkq)
 
+@test
 def test_PCM_from_Bkq2():
 
     from pprint import pprint
@@ -426,6 +432,7 @@ def test_PCM_from_Bkq2():
     dic_Bkq = nja.from_Aqkrk_to_Bkq(dic_CF)
     pprint(dic_Bkq)
 
+@test
 def test_TanabeSugano():
 
     def red_proj_LS(proj_LS):
@@ -447,7 +454,7 @@ def test_TanabeSugano():
 
     #first point at 0 CF
     dic = nja.free_ion_param_AB(conf)
-    result = calc.MatrixH(['Hee'], **dic, eig_opt=False, evaluation=True, wordy=False)
+    result = calc.MatrixH(['Hee'], **dic, eig_opt=False, wordy=False)
     proj_LS = nja.projection_basis(result[1:,:], calc.basis_l)
     # fig, ax = plt.subplots()
     # ax.plot(np.zeros_like(result[0,:]), result[0,:]-np.min(result[0,:]), 'o')
@@ -457,7 +464,7 @@ def test_TanabeSugano():
     x_axis = [0.0]
     # names_list = [red_proj_LS(proj_LS)]
     spacing = np.arange(0.01,12,0.1)
-    print(len(spacing))
+    #print(len(spacing))
     for i in range(len(spacing)):
         data_mult = copy.deepcopy(data)
         data_mult[:,-1] *= spacing[i]
@@ -475,9 +482,9 @@ def test_TanabeSugano():
         # names = red_proj_LS(proj_LS)
         # names_list.append(names)
         x_axis.append(-(w[0]-w[-1])/B)
-        print(f'{i}    {x_axis[-1]/10}       ',end='\r')
+        #print(f'{i}    {x_axis[-1]/10}       ',end='\r')
         dic['dic_bkq'] = dic_Bkq
-        result = calc.MatrixH(['Hee','Hcf'], **dic, eig_opt=False, evaluation=True, wordy=False)
+        result = calc.MatrixH(['Hee','Hcf'], **dic, eig_opt=False, wordy=False)
         diagram.append((result[0,:]-np.min(result[0,:]))/B)
 
     diagram = np.array(diagram)
@@ -493,9 +500,10 @@ def test_TanabeSugano():
 
     fig, ax = plt.subplots()
     for i in range(diagram.shape[1]):
-        ax.plot(np.array(x_axis)/10, diagram[:,i], 'k', lw=0.5)
+        ax.plot(np.array(x_axis)/10, diagram[:,i].real, 'k', lw=0.5)
     plt.show()
 
+@test
 def test_JahnTeller_bak():
 
     def plot_energy_levels(eigenvalues, ax=None, color='b', label=None, tolerance=0.05, offset=0, delta=0):
@@ -613,7 +621,7 @@ def test_JahnTeller_bak():
         pprint(dic_Bkq)
 
         elem = ['Hee', 'Hcf']
-        result = calc.MatrixH(elem, **dic, eig_opt=False, evaluation=True, wordy=False, save_matrix=True)
+        result = calc.MatrixH(elem, **dic, eig_opt=False, wordy=False, save_matrix=True)
         matrix_result = np.load('matrix.npy')
         matrix = np.zeros((calc.basis.shape[0],calc.basis.shape[0]),dtype='object')
         print(matrix.shape)
@@ -648,23 +656,23 @@ def test_JahnTeller_bak():
                     if Ji==Jj and MJi==MJj:
                         if Li == Lj and Si == Sj:
                             if calc.l==3:
-                                Hee = H.electrostatic_int(calc.basis, *F, eval_bool=False, tab_ee = calc.dic_ee)
+                                Hee = H.electrostatic_int(calc.basis, *F, evaluation=False, tab_ee = calc.dic_ee)
                             else:
-                                Hee = H.electrostatic_int(calc.basis, *F, eval_bool=False)
+                                Hee = H.electrostatic_int(calc.basis, *F, evaluation=False)
                             matrix[i,j] += Hee
                             if i != j:
                                 matrix[j,i] += Hee
 
                 if 'Hso' in elem:
                     if Ji==Jj and MJi==MJj:
-                        Hso = -H.SO_coupling(dic['zeta'], 1, eval=False)
+                        Hso = -H.SO_coupling(dic['zeta'], 1, evaluation=False)
                         matrix[i,j] += Hso
                         if i != j:
                             matrix[j,i] += Hso
 
                 if 'Hcf' in elem:
                     if Si==Sj:
-                        Hcf = -H.LF_contribution(dic['dic_bkq'], eval=False)
+                        Hcf = -H.LF_contribution(dic['dic_bkq'], evaluation=False)
                         matrix[i,j] += Hcf
                         if i != j:
                             matrix[j,i] += np.conj(Hcf)
@@ -739,6 +747,7 @@ def test_JahnTeller_bak():
 
     #plot_CF_energy_single(w, tolerance=0.1)
 
+@test
 def test_JahnTeller():
 
     def plot_energy_levels(eigenvalues, ax=None, color='b', label=None, tolerance=0.05, offset=0, delta=0, barycenter=None):
@@ -910,7 +919,7 @@ def test_JahnTeller():
         pprint(dic_Bkq)
 
         elem = ['Hee','Hcf']
-        result = calc.MatrixH(elem, **dic, eig_opt=False, evaluation=True, wordy=False, save_matrix=True)
+        result = calc.MatrixH(elem, **dic, eig_opt=False, wordy=False, save_matrix=True)
         matrix_result = np.load('matrix.npy')
         matrix = np.zeros((calc.basis.shape[0],calc.basis.shape[0]),dtype='object')
         print(matrix.shape)
@@ -945,23 +954,23 @@ def test_JahnTeller():
                     if Ji==Jj and MJi==MJj:
                         if Li == Lj and Si == Sj:
                             if calc.l==3:
-                                Hee = H.electrostatic_int(calc.basis, *F, eval_bool=False, tab_ee = calc.dic_ee)
+                                Hee = H.electrostatic_int(calc.basis, *F, evaluation=False, tab_ee = calc.dic_ee)
                             else:
-                                Hee = H.electrostatic_int(calc.basis, *F, eval_bool=False)
+                                Hee = H.electrostatic_int(calc.basis, *F, evaluation=False)
                             matrix[i,j] += Hee
                             if i != j:
                                 matrix[j,i] += Hee
 
                 if 'Hso' in elem:
                     if Ji==Jj and MJi==MJj:
-                        Hso = -H.SO_coupling(dic['zeta'], 1, eval=False)
+                        Hso = -H.SO_coupling(dic['zeta'], 1, evaluation=False)
                         matrix[i,j] += Hso
                         if i != j:
                             matrix[j,i] += Hso
 
                 if 'Hcf' in elem:
                     if Si==Sj:
-                        Hcf = -H.LF_contribution(dic['dic_bkq'], eval=False)
+                        Hcf = -H.LF_contribution(dic['dic_bkq'], evaluation=False)
                         matrix[i,j] += Hcf
                         if i != j:
                             matrix[j,i] += np.conj(Hcf)
@@ -1046,6 +1055,7 @@ def test_JahnTeller():
 
     #plot_CF_energy_single(w, tolerance=0.1)
 
+@test
 def test_plot_magnetization_field():
 
     def use_nja_(conf, data, field_vecs, wordy=False):
@@ -1059,7 +1069,7 @@ def test_plot_magnetization_field():
         dic['dic_bkq'] = dic_Bkq
 
         Magn = nja.Magnetics(calc, ['Hcf','Hz'], dic)
-        Magnv, *_ = Magn.susceptibility_field(fields=field_vecs, temp=298., delta = 0.01, evaluation=True, wordy=wordy)
+        Magnv, *_ = Magn.susceptibility_field(fields=field_vecs, temp=298., delta = 0.01, wordy=wordy)
 
         chi_B = Magn.susceptibility_B_copy(np.array([[0.0,0.0,1.0]]), 298., delta = 0.1)[0]
 
@@ -1153,7 +1163,7 @@ def test_plot_magnetization_field():
     data = nja.read_data('test/bbpn.inp', sph_flag = False)
     # coord = data[:,1:-1]
 
-    rep2000_cryst = np.array(nja.crystdat.rep168_cryst)
+    rep2000_cryst = np.array(crystdat.rep168_cryst)
 
     xyz = np.zeros((rep2000_cryst.shape[0],3))
 
@@ -1189,7 +1199,7 @@ def test_torque():
     dic['dic_bkq'] = dic_Bkq
 
     calc = nja.calculation(conf, ground_only=True, TAB=True, wordy=False)
-    _, _ = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    _, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
     basis = np.loadtxt('matrix_label.txt')
     LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
 
@@ -1781,7 +1791,7 @@ def test_energy_allconf_d():
         dic = nja.free_ion_param_AB(conf)
         dic['dic_bkq'] = dic_Bkq
         calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
-        result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, save_matrix=True)
+        result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, wordy=False, ground_proj=True, save_matrix=True)
 
         # test over matrix elements
         check = np.loadtxt("test/f_electron/"+conf+".txt")
@@ -1813,7 +1823,7 @@ def test_tables_d():
         dic['dic_bkq'] = dic_Bkq
 
         calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
-        result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, save_matrix=True)
+        result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, wordy=False, ground_proj=True, save_matrix=True)
 
         # test over matrix elements
         check_R = np.loadtxt("test/f_electron/"+conf+".txt")
@@ -1839,7 +1849,7 @@ def test_energy_allconf_f():
         dic['dic_bkq'] = dic_Bkq
 
         calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
-        result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, save_matrix=True, save_label=True)
+        result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, wordy=False, ground_proj=True, save_matrix=True, save_label=True)
         label_matrix = np.loadtxt('matrix_label.txt')
         # test over matrix elements
         check_R = np.loadtxt("test/f_electron/"+conf+"_R.txt")
@@ -1911,7 +1921,7 @@ def test_tables_f():
         dic['dic_bkq'] = dic_Bkq
 
         calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
-        result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, save_matrix=True)
+        result = calc.MatrixH(['Hee', 'Hso', 'Hcf'], **dic, eig_opt=False, wordy=False, ground_proj=True, save_matrix=True)
 
         # test over matrix elements
         check_R = np.loadtxt("test/f_electron/"+conf+"_R.txt")
@@ -2007,10 +2017,10 @@ def test_PCM():  #with SIMPRE
     dic_Bqk = nja.calc_Bqk(data, conf, False, True)
 
     ## There's a sign mismatch between Bkq computed with SIMPRE and those from NJA
-    Aqkrk_simpre = cfp_matrix[:,2]
-    Bqk_simpre = cfp_matrix[:,3]
-    Aqkrk_nja = np.array([dic_Aqkrk[str(int(k))][str(int(q))] for k,q in cfp_matrix[:,0:2]])
-    Bqk_nja = np.array([dic_Bqk[str(int(k))][str(int(q))] for k,q in cfp_matrix[:,0:2]])
+    # Aqkrk_simpre = cfp_matrix[:,2]
+    # Bqk_simpre = cfp_matrix[:,3]
+    # Aqkrk_nja = np.array([dic_Aqkrk[str(int(k))][str(int(q))] for k,q in cfp_matrix[:,0:2]])
+    # Bqk_nja = np.array([dic_Bqk[str(int(k))][str(int(q))] for k,q in cfp_matrix[:,0:2]])
     # pprint(Aqkrk_simpre)
     # pprint(Aqkrk_nja)
     # assert np.allclose(Aqkrk_simpre, Aqkrk_nja, rtol=1e-5, atol=1e-5)
@@ -2025,7 +2035,7 @@ def test_PCM():  #with SIMPRE
 
     dic = {'dic_bkq': dic_Bkq2}
     calc = nja.calculation(conf, ground_only=True, TAB=True, wordy=False)
-    result, proj_nja = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True, return_proj=True, ground_proj=True)
+    result, proj_nja = calc.MatrixH(contributes, **dic, eig_opt=False, return_proj=True, ground_proj=True)
 
     E_nja = result[0,:].real-min(result[0,:].real)
     E_simpre = matrix[:,0]
@@ -2107,7 +2117,7 @@ def test_StevensfromMOLCAS():
     dic_Bkq['0']['0'] = 0
 
     calc = nja.calculation(conf, ground_only=True, TAB=True)
-    _, projected = calc.MatrixH(contributes, **dic, evaluation=True, ground_proj=True, return_proj=True)
+    _, projected = calc.MatrixH(contributes, **dic, ground_proj=True, return_proj=True)
     Mground, perc = nja.the_highest_MJ(projected[1], np.arange(15/2,-0.5,-1)) 
     
     assert Mground == 15/2 and perc > 94.0
@@ -2286,7 +2296,7 @@ def test_M_vector():
     dic = nja.read_AILFT_orca6('test/CrF63-.out', conf)
 
     calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
-    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
     basis = np.loadtxt('matrix_label.txt')
     LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
 
@@ -2326,7 +2336,7 @@ def test_M_vector2():
     dic_Bkq = nja.from_Vint_to_Bkq(dic_V, conf)
     dic = {'F2':0, 'F4':0, 'zeta':0, 'dic_bkq': dic_Bkq}
     calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
-    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
     basis = np.loadtxt('matrix_label.txt')
     LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
 
@@ -2370,7 +2380,7 @@ def test_gtensor():
     dic_Bkq['0']['0'] = 0
 
     calc = nja.calculation(conf, ground_only=True, TAB=True, wordy=False)
-    result = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True)
+    result = calc.MatrixH(contributes, **dic, eig_opt=False)
     E = np.copy(result[0,:]).real
     energy_print = np.around(E-min(E),8)
     energy_list, energy_count = np.unique(energy_print, return_counts=True)
@@ -2413,7 +2423,7 @@ def test_susceptibility_B_ord1():
     dic = {'F2': 85687.2, 'F4': 48274.5, 'zeta': 643.4, 'dic_bkq': dic_Bkq}
 
     calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
-    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
     basis = np.loadtxt('matrix_label.txt')
     LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
 
@@ -2466,7 +2476,7 @@ def test_susceptibility_B_ord1_2():
     dic = {'F2': 93649.1, 'F4': 58398.0, 'zeta': 648.1, 'dic_bkq': dic_Bkq}
 
     calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
-    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
     basis = np.loadtxt('matrix_label.txt')
     LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
     
@@ -2474,7 +2484,7 @@ def test_susceptibility_B_ord1_2():
     
     Magn = nja.Magnetics(calc, ['Hee', 'Hcf', 'Hso','Hz'], dic)
 
-    chi_B = Magn.susceptibility_B_copy(fields=np.array([[0.0,0.0,0.0]]), temp=298., delta = 0.01, evaluation=True)   #provare a mettere + e - differenza invece che + e 0
+    chi_B = Magn.susceptibility_B_copy(fields=np.array([[0.0,0.0,0.0]]), temp=298., delta = 0.01)   #provare a mettere + e - differenza invece che + e 0
 
     if not np.array_equal(np.round(chi_B_diff, 37),np.round(chi_B[0], 37)):
         print('chi_B_diff',chi_B_diff)
@@ -2484,56 +2494,6 @@ def test_susceptibility_B_ord1_2():
 
 @test
 def test_susceptibility_B_ord1_3():
-
-    def fig_rep_magnfield(Mvec, xyz, data=None):
-
-        import matplotlib
-        import matplotlib.cm as cm
-
-        def cmap2list(cmap, N=10, start=0, end=1):
-            x = np.linspace(start, end, N)
-            colors = cmap(x)
-            return colors
-
-        ### plot magnetization surface
-        fig = plt.figure()
-        ax = fig.add_subplot(121, projection='3d', facecolor='white')
-        Mvec = np.reshape(Mvec,(len(Mvec),1))
-        data_p = np.hstack((Mvec,xyz))
-        data_p = data_p[data_p[:, 0].argsort()]
-        vectors = data_p[:,1:]
-        norm_or = data_p[:,0]
-        
-        colorlist = cmap2list(cm.coolwarm, N=vectors.shape[0])
-
-        ax.scatter(vectors[:,0],vectors[:,1],vectors[:,2], color=colorlist)
-
-        box = plt.axes([0.75, 0.3, 0.02, 0.45])
-        norm = matplotlib.colors.Normalize(norm_or[0],norm_or[-1])
-        plt.colorbar(cm.ScalarMappable(norm=norm, cmap=cm.coolwarm), cax=box)
-        ax.set_xlabel('x')
-        ax.set_ylabel('y')
-        ax.set_zlabel('z')
-
-        if data is not None:
-            for i in range(data.shape[0]):
-                vector = data[i,1:-1]
-                ax.plot([0.,vector[0]],[0.,vector[1]],[0.,vector[2]],'--',lw=0.2,c='k')
-                if data[i,0] in nja.color_atoms().keys():
-                    ax.scatter(vector[0],vector[1],vector[2],'o',c = nja.color_atoms()[data[i,0]],lw=3)
-                else:
-                    ax.scatter(vector[0],vector[1],vector[2],'o',c = nja.color_atoms()['_'],lw=3)
-                ax.text(vector[0]+0.4*np.sign(vector[0]),vector[1]+0.4*np.sign(vector[1]),vector[2]+0.4*np.sign(vector[2]),data[i,-1], size=8)
-
-        ax.set_xlim(-4, 4)
-        ax.set_ylim(-4, 4)
-        ax.set_zlim(-4, 4)
-
-        # Remove the grid
-        ax.grid(False)
-
-        plt.show()
-
 
     conf = 'f9'
     contributes = ['Hcf']
@@ -2566,7 +2526,7 @@ def test_susceptibility_B_ord1_3():
     dic_Bkq['0']['0'] = 0
 
     calc = nja.calculation(conf, ground_only=True, TAB=True, wordy=False)
-    _, _ = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    _, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
     basis = np.loadtxt('matrix_label.txt')
     LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
     
@@ -2592,6 +2552,7 @@ def test_susceptibility_B_ord1_3():
     assert chi_B_diff[0,0] > 1e-33
     assert err_B[0,0] < chi_B_diff[0,0]*1e-3
 
+@test
 def test_susceptibility_B_ord1_4():
 
     conf = 'f2'
@@ -2613,7 +2574,7 @@ def test_susceptibility_B_ord1_4():
     dic_Bkq['0'] = {}
     dic_Bkq['0']['0'] = 0
 
-    # #g ref syst for Pr from J. Am. Chem. Soc. 2021, 143, 8108−8115
+    # chi ref syst for Pr from J. Am. Chem. Soc. 2021, 143, 8108−8115
     Rot_mat = np.array([[-0.671039,-0.017267,-0.741221],[-0.027448,-0.998465,0.048109],[-0.740914,0.052628,0.669535]])  
  
     R = scipy.spatial.transform.Rotation.from_matrix(Rot_mat.T).as_quat()
@@ -2625,7 +2586,7 @@ def test_susceptibility_B_ord1_4():
     dic_Bkq['0']['0'] = 0
 
     calc = nja.calculation(conf, ground_only=True, TAB=False, wordy=False)
-    _, _ = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    _, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
     basis = np.loadtxt('matrix_label.txt')
     LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
     
@@ -2673,7 +2634,7 @@ def test_calc_susceptibility_zerofield():
     dic = {'F2':93649.1, 'F4':58398.0, 'zeta':648.1, 'dic_bkq': dic_Bkq}
 
     calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
-    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, evaluation=True, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
     basis = np.loadtxt('matrix_label.txt')
     LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
 
@@ -2733,8 +2694,8 @@ if __name__ == '__main__':
     #### actual tests
     test_energy_allconf_d()     #d2, d3, d4, d5, d6, d7, d8, d9
     test_tables_d()
-    test_energy_allconf_f()     #f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13 (takes 3:30 h with clean ram)
-    test_tables_f()
+    # test_energy_allconf_f()     #f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13 (takes 3:30 h with clean RAM)
+    # test_tables_f()
     test_conv_AqkrkBkq() #f11
     test_PCM() #f9
     test_PCM_2() #f10
@@ -2761,7 +2722,7 @@ if __name__ == '__main__':
     #### not real tests
     # test_calc_ee_int_f()
 
-    #### failed experiments
+    #### failed experiments :(
     # test_JahnTeller()
     # test_PCM_from_Bkq()
     
