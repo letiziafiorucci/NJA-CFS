@@ -2550,7 +2550,11 @@ def fig_tensor_rep_1(tensor, n_points=40):
     ax.patch.set_alpha(0.0)
 
     # Hide the axes and labels
-    ax.set_axis_off()
+    # ax.set_axis_off()
+
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
 
     # Calculate the limits for each axis
     x_limits = [x_scaled.min(), x_scaled.max()]
@@ -2569,7 +2573,7 @@ def fig_tensor_rep_1(tensor, n_points=40):
     # Add a colorbar
     mappable = plt.cm.ScalarMappable(cmap='turbo', norm=norm)
     mappable.set_array(magnitudes)
-    plt.colorbar(mappable, ax=ax, shrink=0.5, aspect=5)
+    plt.colorbar(mappable, ax=ax, shrink=0.5, aspect=8)
 
     plt.show()
 
@@ -3040,8 +3044,8 @@ def from_Vint_to_Bkq(dic_V, conf):
                    '6':{'0':(1./7.)*np.sqrt(13*np.pi)*(2*dic_V['11'] - (3./2.)*(dic_V['22']+dic_V['33']) + (3./5.)*(dic_V['44']+dic_V['55']) - (1./10.)*(dic_V['66']+dic_V['77'])),
                         '1':np.sqrt((13./7.)*np.pi)*(-dic_V['31'] + (1./2.)*np.sqrt(3./5.)*(dic_V['42']+dic_V['53']) + (1./10.)*(-dic_V['64']-dic_V['75'])),
                         '-1':np.sqrt((13./7.)*np.pi)*(dic_V['21'] + (1./2.)*np.sqrt(3./5.)*(-dic_V['43']+dic_V['52']) + (1./10.)*(dic_V['65']-dic_V['74'])),
-                        '2':np.sqrt((13./7.)*np.pi)*(-(1./2.)*np.sqrt(3./5.)*(dic_V['22']-dic_V['33']) + (4./5.)*dic_V['51'] - (1./5.)*(dic_V['62']+dic_V['73'])),
-                        '-2':np.sqrt((13./7.)*np.pi)*(-np.sqrt(3./5.)*dic_V['32'] - (4./5.)*dic_V['41'] + (1./5.)*(dic_V['63']-dic_V['72'])),
+                        '2':np.sqrt((13./7.)*np.pi)*(-(1./2.)*np.sqrt(3./5.)*(dic_V['22']-dic_V['33']) + (4/5)*dic_V['51'] - (1./5.)*(dic_V['62']+dic_V['73'])),
+                        '-2':np.sqrt((13./7.)*np.pi)*(-np.sqrt(3./5.)*dic_V['32'] - (4/5)*dic_V['41'] + (1./5.)*(dic_V['63']-dic_V['72'])),
                         '3': (3./5.)*np.sqrt((39./14.)*np.pi)*(dic_V['42']-dic_V['53']) + (1./5.)*(np.sqrt((78./7.)*np.pi))*(-dic_V['71']),
                         '-3': (3./5.)*np.sqrt((39./14.)*np.pi)*(dic_V['43']+dic_V['52']) + (1./5.)*(np.sqrt((78./7.)*np.pi))*(dic_V['61']),
                         '4': (3./5.)*np.sqrt((26./7.)*np.pi)*(-dic_V['44']/2 + dic_V['55']/2) + np.sqrt((39./70.)*np.pi)*(-dic_V['62']+dic_V['73']),
@@ -5405,6 +5409,9 @@ def read_AILFT_orca6(filename, conf, method='CASSCF', return_V=False, rotangle_V
             '61':matrix[5,0]*from_au,'62':matrix[5,1]*from_au,'63':matrix[5,2]*from_au,'64':matrix[5,3]*from_au,'65':matrix[5,4]*from_au,'66':matrix[5,5]*from_au,
             '71':matrix[6,0]*from_au,'72':matrix[6,1]*from_au,'73':matrix[6,2]*from_au,'74':matrix[6,3]*from_au,'75':matrix[6,4]*from_au,'76':matrix[6,5]*from_au,'77':matrix[6,6]*from_au
         }
+
+        #pprint(dic_V)
+        #exit()
         
         dic_Bkq = from_Vint_to_Bkq(dic_V, conf)
         dic['dic_bkq'] = dic_Bkq
@@ -5698,7 +5705,8 @@ def from_Vint_to_Bkq_2(l, dic_, reverse=False):
         B4_m4 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -np.sqrt(7.*np.pi/5.)*np.sqrt(2), 0]
 
         conv_matrix = np.vstack((B0_0, B2_0, B2_1, B2_m1, B2_2, B2_m2, B4_0, B4_1, B4_m1, B4_2, B4_m2, B4_3, B4_m3, B4_4, B4_m4))
-
+        # U, S, Vt = np.linalg.svd(conv_matrix)
+        # print(f'Conditioning number: {S[0]/S[-1]}')
 
     elif l==3:
 
@@ -5720,8 +5728,8 @@ def from_Vint_to_Bkq_2(l, dic_, reverse=False):
         B6_0 = [(1./7.)*np.sqrt(13*np.pi)*(2), 0, (1./7.)*np.sqrt(13*np.pi)*(-(3./2.)), 0, 0, (1./7.)*np.sqrt(13*np.pi)*(-(3./2.)), 0, 0, 0, (1./7.)*np.sqrt(13*np.pi)*(3./5.), 0, 0, 0, 0, (1./7.)*np.sqrt(13*np.pi)*(3./5.), 0, 0, 0, 0, 0, -(1./7.)*np.sqrt(13*np.pi)*(1./10.), 0, 0, 0, 0, 0, 0, -(1./7.)*np.sqrt(13*np.pi)*(1./10.)]
         B6_1 = [0, 0, 0, np.sqrt((13./7.)*np.pi)*(-1), 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./2.)*np.sqrt(3./5.), 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./2.)*np.sqrt(3./5.), 0, 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./10.)*(-1), 0, 0, 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./10.)*(-1), 0, 0]
         B6_m1 = [0, np.sqrt((13./7.)*np.pi), 0, 0, 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./2.)*np.sqrt(3./5.)*(-1), 0, 0, np.sqrt((13./7.)*np.pi)*(1./2.)*np.sqrt(3./5.), 0, 0, 0, 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./10.), 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./10.)*(-1), 0, 0, 0]
-        B6_2 = [0, 0, np.sqrt((13./7.)*np.pi)*(-1./2.)*np.sqrt(3./5.), 0, 0, np.sqrt((13./7.)*np.pi)*(1./2.)*np.sqrt(3./5.), 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(4./5.), 0, 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./5.)*(-1), 0, 0, 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./5.)*(-1), 0, 0, 0, 0]
-        B6_m2 = [0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(-np.sqrt(3./5.)), 0, np.sqrt((13./7.)*np.pi)*(- (4./5.)), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./5.), 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./5.)*(-1), 0, 0, 0, 0, 0]
+        B6_2 = [0, 0, np.sqrt((13./7.)*np.pi)*(-1./2.)*np.sqrt(3./5.), 0, 0, np.sqrt((13./7.)*np.pi)*(1./2.)*np.sqrt(3./5.), 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*4/5, 0, 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./5.)*(-1), 0, 0, 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./5.)*(-1), 0, 0, 0, 0]
+        B6_m2 = [0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(-np.sqrt(3./5.)), 0, np.sqrt((13./7.)*np.pi)*(- 4/5), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./5.), 0, 0, 0, 0, np.sqrt((13./7.)*np.pi)*(1./5.)*(-1), 0, 0, 0, 0, 0]
         B6_3 = [0, 0, 0, 0, 0, 0, 0, (3./5.)*np.sqrt((39./14.)*np.pi), 0, 0, 0, 0, (3./5.)*np.sqrt((39./14.)*np.pi)*(-1), 0, 0, 0, 0, 0, 0, 0, 0, (1./5.)*(np.sqrt((78./7.)*np.pi))*(-1), 0, 0, 0, 0, 0, 0]
         B6_m3 = [0, 0, 0, 0, 0, 0, 0, 0, (3./5.)*np.sqrt((39./14.)*np.pi), 0, 0, (3./5.)*np.sqrt((39./14.)*np.pi), 0, 0, 0, (1./5.)*(np.sqrt((78./7.)*np.pi)), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         B6_4 = [0, 0, 0, 0, 0, 0, 0, 0, 0, (3./5.)*np.sqrt((26./7.)*np.pi)*(-1/2), 0, 0, 0, 0, (3./5.)*np.sqrt((26./7.)*np.pi)*(1/2), 0, np.sqrt((39./70.)*np.pi)*(-1), 0, 0, 0, 0, 0, 0, np.sqrt((39./70.)*np.pi), 0, 0, 0, 0]
@@ -5732,7 +5740,8 @@ def from_Vint_to_Bkq_2(l, dic_, reverse=False):
         B6_m6 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (1./5.)*(np.sqrt((429./7.)*np.pi))*(-1), 0] 
 
         conv_matrix = np.vstack((B0_0, B2_0, B2_1, B2_m1, B2_2, B2_m2, B4_0, B4_1, B4_m1, B4_2, B4_m2, B4_3, B4_m3, B4_4, B4_m4, B6_0, B6_1, B6_m1, B6_2, B6_m2, B6_3, B6_m3, B6_4, B6_m4, B6_5, B6_m5, B6_6, B6_m6))
-
+        # U, S, Vt = np.linalg.svd(conv_matrix)
+        # print(f'Conditioning number: {S[0]/S[-1]}')
     
     if not reverse:
         B = np.dot(conv_matrix, V)
