@@ -2124,6 +2124,100 @@ def test_StevensfromMOLCAS():
     assert Mground == 15/2 and perc > 94.0
 
 @test
+def test_conv_Vint_Bkq_d():
+
+    conf = 'd8'
+    contributes = ['Hee', 'Hcf', 'Hso']
+
+    #from NiSAL-HDPT calcsuscenisal_10.out NEVPT2
+    #(xy yz z2 xz x2-y2)
+    dic_V1_orca = {'11':-1537343.193973,
+        '21':-197.966117, '22':-1536481.975521,
+        '31':2138.341330, '32':2620.966044, '33':-1534906.147670,
+        '41':2944.032701, '42':1955.080014, '43':3930.351693, '44':-1531161.910464,
+        '51':-599.165743, '52':1115.150600, '53':102.275178, '54':-2462.285886, '55':-1535571.155802}
+    
+    #(z2 yz xz xy x2-y2)
+    dic_V = {'11':dic_V1_orca['33'],
+        '21':dic_V1_orca['32'], '22':dic_V1_orca['22'],
+        '31':dic_V1_orca['43'], '32':dic_V1_orca['42'], '33':dic_V1_orca['44'],
+        '41':dic_V1_orca['31'], '42':dic_V1_orca['21'], '43':dic_V1_orca['41'], '44':dic_V1_orca['11'],
+        '51':dic_V1_orca['53'], '52':dic_V1_orca['52'], '53':dic_V1_orca['54'], '54':dic_V1_orca['51'], '55':dic_V1_orca['55']}
+
+    dic_Bkq = nja.from_Vint_to_Bkq(dic_V, conf)
+    dic_Bkq['0']['0'] = 0
+    dic = {'F2': 85687.2, 'F4': 48274.5, 'zeta': 643.4, 'dic_bkq': dic_Bkq}
+
+    calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
+    result1, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+    
+    dic_V1 = nja.from_Vint_to_Bkq_2(2, dic_Bkq, reverse=True)
+    dic_Bkq = nja.from_Vint_to_Bkq(dic_V1, conf)
+    dic_Bkq['0']['0'] = 0
+    dic = {'F2': 85687.2, 'F4': 48274.5, 'zeta': 643.4, 'dic_bkq': dic_Bkq}
+    
+    calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
+    result2, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+    
+    assert np.allclose(result1.real, result2.real)
+    assert np.allclose(result1.imag, result2.imag)
+
+    dic = {'F2': 85687.2, 'F4': 48274.5, 'zeta': 643.4, 'dic_V': dic_V1}
+
+    calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
+    result3, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+
+    assert np.allclose(result1.real, result3.real)
+    assert np.allclose(result1.imag, result3.imag)
+    
+# @test
+# def test_conv_Vint_Bkq_f():
+
+#     conf = 'f13'
+#     contributes = ['Hee', 'Hcf', 'Hso']
+
+#     dic = nja.read_AILFT_orca6('test/run_YbDOTA.out', conf)
+#     # pprint(dic['dic_bkq'])
+#     # dic2 = dic.copy()
+
+#     calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+#     result1, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+    
+#     dic_V1 = nja.from_Vint_to_Bkq_2(3, dic['dic_bkq'], reverse=True)
+#     # pprint(dic_V1)
+#     dic_Bkq = nja.from_Vint_to_Bkq_2(3, nja.read_AILFT_orca6('test/run_YbDOTA.out', conf, return_V=True))
+#     # pprint(dic_Bkq)
+#     # exit()
+#     #dic_Bkq['0']['0'] = 0
+#     dic['dic_bkq'] = dic_Bkq
+
+#     # for k in range(0,7,2):
+#     #     for q in range(-k, k+1, 1):
+#     #         if k in dic2.keys() and q in dic2[str(int(k))].keys():
+#     #             assert dic_Bkq[str(int(k))][str(int(q))]==dic2[str(int(k))][str(int(q))]
+#     # assert dic['zeta']==dic2['zeta']
+#     # assert dic['F2']==dic2['F2']
+#     # assert dic['F4']==dic2['F4']
+#     # assert dic['F6']==dic2['F6']
+#     #pprint(dic)
+    
+#     calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+#     result2, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+    
+#     assert np.allclose(result1.real, result2.real, rtol=2, atol=1e-3)
+#     assert np.allclose(result1.imag, result2.imag, rtol=2, atol=1e-3)
+
+#     # remove dic_bkq from dic
+#     del dic['dic_bkq']
+#     dic['dic_V'] = dic_V1
+
+#     calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+#     result3, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+
+#     assert np.allclose(result1.real, result3.real, rtol=2, atol=1e-3)
+#     assert np.allclose(result1.imag, result3.imag, rtol=2, atol=1e-3)
+
+@test
 def test_Wigner_Euler_quat():
 
     A = 5.23375087
@@ -2697,28 +2791,30 @@ if __name__ == '__main__':
     # test_tables_d()
     # test_energy_allconf_f()     #f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13 (takes 3:30 h with clean RAM)
     # test_tables_f()
-    # test_conv_AqkrkBkq() #f11
-    # test_PCM() #f9
-    # test_PCM_2() #f10
-    # test_StevensfromMOLCAS #f9
-    # test_Wigner_Euler_quat()
-    # test_Wigner_Euler_quat2()
-    # test_LF_rotation_euler()
-    # test_LF_rotation_quat()
-    # test_mag_moment()  #d1
-    # test_mag_moment2()  #f9
-    # test_M_vector()  #d3
-    # test_M_vector2()  #d9
-    # test_gtensor()  #f13
-    # test_susceptibility_B_ord1()  #d8
-    # test_susceptibility_B_ord1_2()  #d8
-    # test_susceptibility_B_ord1_3()  #f9
-    # test_susceptibility_B_ord1_4()  #f2
-    # test_calc_susceptibility_zerofield()  #d8
+    test_conv_AqkrkBkq() #f11
+    test_conv_Vint_Bkq_d() #d8
+    test_PCM() #f9
+    test_PCM_2() #f10
+    test_StevensfromMOLCAS #f9
+    test_Wigner_Euler_quat()
+    test_Wigner_Euler_quat2()
+    test_LF_rotation_euler()
+    test_LF_rotation_quat()
+    test_mag_moment()  #d1
+    test_mag_moment2()  #f9
+    test_M_vector()  #d3
+    test_M_vector2()  #d9
+    test_gtensor()  #f13
+    test_susceptibility_B_ord1()  #d8
+    test_susceptibility_B_ord1_2()  #d8
+    test_susceptibility_B_ord1_3()  #f9
+    test_susceptibility_B_ord1_4()  #f2
+    test_calc_susceptibility_zerofield()  #d8
     test_torque()
 
     #### on development
     # test_reduction()
+    # test_conv_Vint_Bkq_f() #f13
 
     #### not real tests
     # test_calc_ee_int_f()
