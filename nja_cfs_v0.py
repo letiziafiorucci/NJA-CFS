@@ -13,6 +13,7 @@ from pprint import pprint
 import copy
 import warnings
 import sympy
+import crystdat
 
 __version__ = "0.1.4"
 
@@ -1360,13 +1361,16 @@ class calculation():
                 print('ERROR: BKQ dict is missing in MatrixH')
                 exit()
 
-        if eig_opt==True:
+        if eig_opt:
             print('\nWavefunction optimization...')
-            rot_angles, dic_bkq = self.eigenfunc_opt(elem, dic_CF = dic_bkq, F0=F0, F2=F2, F4=F4, F6=F6, zeta=zeta, k=k, field=field)
+            dic_bkq, quat = self.opt_eigenfunction_minimization(self.l, self, dic_bkq)
             print('...done')
-            print('CFP rotation angles: ', rot_angles)
-        elif eig_opt==False and cfp_angles is not None:
+            print('CFP rotation quaternion: ', quat)
+        elif not eig_opt and cfp_angles is not None and len(cfp_angles)==3:
             dic_bkq = rota_LF(self.l, dic_bkq, *cfp_angles)
+        elif not eig_opt and cfp_angles is not None and len(cfp_angles)>3:
+            dict, coeff = read_DWigner_quat()
+            dic_bkq = rota_LF_quat(self.l, dic_bkq, cfp_angles, dict, coeff)
         else:
             pass
 
@@ -1529,6 +1533,106 @@ class calculation():
 
         return matrix
 
+    @staticmethod
+    def opt_eigenfunction_minimization(calc, dic_Bkq):
+
+        from scipy.optimize import dual_annealing
+        from scipy.optimize import least_squares
+        import time
+
+        def use_nja_(calc, dic, wordy=False):
+            result = calc.MatrixH(['Hcf'], **dic, eig_opt=False, wordy=wordy)
+            ground_state = np.abs(result[1:,0])**2
+            or_ground_state = np.sort(ground_state)
+            return or_ground_state
+
+        cycle = 0
+        def target(quat, x):
+            nonlocal cycle
+            cycle += 1
+            dic_rot = rota_LF_quat(3, dic_Bkq, quat, dict, coeff)
+            dic = {'dic_bkq': dic_rot}
+            ground_comp = use_nja_(calc, dic, wordy=False)*100
+            print(f'Opt cycle: {cycle}, target: {np.sum((ground_comp-x)**2):.4e}, highest comp: {ground_comp[-1]:.2f}', end='\r')
+            return np.sum((ground_comp-x)**2) 
+        
+        dict, coeff = read_DWigner_quat()
+
+        x = np.zeros(16)
+        x[-1] = 100
+
+        start_time = time.time()
+        bounds = [(-1, 1), (-1, 1), (-1, 1), (-1, 1)]
+        bounds_ls = ([-1, -1, -1, -1], [1, 1, 1, 1])
+        result_global = dual_annealing(target, bounds, args=(x,), accept=-5.0, maxiter=500, maxfun=1000, seed=666, no_local_search=True)
+        result = least_squares(target, result_global.x, bounds=bounds_ls, args=(x, ))
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print('\n'+f"Opt time: {elapsed_time:.2f} seconds"+'\n')
+
+        dic_rot = rota_LF_quat(calc.l, dic_Bkq, result.x, dict, coeff)
+
+        R = result.x
+        quat = [R[-1], R[0], R[1], R[2]]
+
+        return dic_rot, quat
+
+    @staticmethod
+    def opt_eigenfunction_grid(calc, dic_Bkq):
+
+        import time
+
+        def use_nja_(calc, dic, wordy=False):
+            result = calc.MatrixH(['Hcf'], **dic, eig_opt=False, wordy=wordy)
+            ground_state = np.abs(result[1:,0])**2
+            or_ground_state = np.sort(ground_state)
+            return or_ground_state
+        
+        dict, coeff = read_DWigner_quat()
+
+        x = np.zeros(16)
+        x[-1] = 1
+
+        rep_cryst = np.array(crystdat.rep678_cryst)
+
+        target_list = []
+
+        start_time = time.time()
+
+        for i in range(rep_cryst.shape[0]):
+
+            angles = rep_cryst[i,:]
+            a = angles[0]
+            b = angles[1]
+
+            r = scipy.spatial.transform.Rotation.from_euler('ZYZ', [0,b,a], degrees=True)
+            R = r.as_quat()
+            quat = [R[-1], R[0], R[1], R[2]]
+
+            dic_rot = rota_LF_quat(calc.l, dic_Bkq, quat, dict, coeff)
+            dic = {'dic_bkq': dic_rot}
+            
+            ground_comp = use_nja_(calc, dic, wordy=False)
+
+            target = np.sum((np.abs(ground_comp-x))**2)
+            target_list.append(target)
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Opt time: {elapsed_time:.2f} seconds"+'\n')
+
+        target_list = np.array(target_list)
+
+        min_index = np.argmin(target_list)
+        angles = rep_cryst[min_index,:]
+        a = angles[0]
+        b = angles[1]
+        r = scipy.spatial.transform.Rotation.from_euler('ZYZ', [0,b,a], degrees=True)
+        R = r.as_quat()
+        quat = [R[-1], R[0], R[1], R[2]]
+        dic_rot = rota_LF_quat(calc.l, dic_Bkq, quat, dict, coeff)
+
+        return dic_rot, quat
 
 #======================= NEW FUNCTIONS for MAGNETIC PROPERTIES ==============================
 
@@ -2510,6 +2614,60 @@ def the_highest_L(proj, conf):
     return L, perc
 
 #######FIGURES###########
+
+def plot_energy_levels(eigenvalues, ax=None, color='b', label=None, tolerance=0.05, offset=0, delta=0):
+    """
+    Plot crystal field energy levels from a splitting matrix with a horizontal offset.
+    
+    Parameters:
+    - splitting_matrix: 2D numpy array, the crystal field splitting matrix to analyze.
+    - ax: matplotlib axis, optional. If provided, plots on this axis.
+    - color: str, color of the levels (e.g., 'b' for blue).
+    - label: str, optional label to identify different crystal fields.
+    - tolerance: float, maximum difference to group levels as degenerate.
+    - offset: float, horizontal offset to place the energy levels of this crystal field.
+    """
+    
+    # Sort and group nearly degenerate energy levels
+    unique_levels = []
+    grouped_levels = []
+
+    for ev in sorted(eigenvalues):
+        if not unique_levels or abs(ev - unique_levels[-1]) > tolerance:
+            unique_levels.append(ev)
+            grouped_levels.append([ev])
+        else:
+            grouped_levels[-1].append(ev)
+    
+    # Create the plot if no axis was provided
+    if ax is None:
+        fig, ax = plt.subplots()
+    
+    # Set up offsets for degenerate states
+    x_offset = 0.15  # Small offset within a group of degenerate levels
+
+    # Plot each level with offsets for degenerate states, shifted by the main offset
+    for level_group in grouped_levels:
+        energy = level_group[0]  # Common energy level for the degenerate group
+        n_deg = len(level_group)  # Number of degenerate states
+        x_positions = np.linspace(-x_offset * (n_deg - 1) / 2, x_offset * (n_deg - 1) / 2, n_deg) + offset
+
+        # Plot each degenerate level with the specified color
+        for x in x_positions:
+            ax.hlines(y=energy, xmin=x - 0.05 +delta, xmax=x + 0.05+delta, color=color, linewidth=2)
+
+    # Add label if provided
+    if label:
+        ax.text(offset + 0.22+delta, max(unique_levels) + 0.2, label, ha='center', color=color)
+
+    # Update plot appearance
+    ax.set_ylabel("Energy Levels")
+    ax.grid(axis='y', linestyle='--', alpha=0.5)
+
+    
+    ax.get_xaxis().set_visible(False)
+
+    return ax  # Return axis to allow further modifications
 
 def fig_tensor_rep_1(tensor, n_points=40):
 
