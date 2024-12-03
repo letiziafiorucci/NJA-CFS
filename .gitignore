@@ -12,6 +12,7 @@ OctoYot/
 !cfp_*_conf.txt
 !test/complete_matrices/d*.txt
 !test/*.inp
+!test/CFP_PrDOTA.txt
 NJA-manuscript*
 my_test_nja.py
 simpre.par
