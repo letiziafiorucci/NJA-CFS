@@ -49,63 +49,35 @@ def test(func):
             print('Execution time: {}'.format(end_time - start_time))
     return wrapper
 
+def cron(func, *args, **kwargs):
+    """
+    Decorator function to monitor the runtime of a function.
+    
+    This function takes another function as input, along with any number of positional and keyword arguments.
+    It then defines a new function that wraps the input function, adding functionality to measure and print its runtime.
+    
+    Parameters:
+    func (function): The function to be decorated.
+    *args: Variable length argument list for the function to be decorated.
+    **kwargs: Arbitrary keyword arguments for the function to be decorated.
+
+    Returns:
+    new_func (function): The decorated function with added functionality to print its runtime.
+    """
+    def new_func(*args, **kwargs):
+        #print(f'Function "{func.__name__}" was called.')
+        start_time = datetime.now()
+
+        return_values = func(*args, **kwargs)
+
+        end_time = datetime.now()
+        run_time = end_time - start_time
+        print(f'Runtime {func.__name__}: {run_time}\n')
+        return return_values
+    return new_func
+
 @test
 def test_CF_splitting():
-
-    def plot_energy_levels(eigenvalues, ax=None, color='b', label=None, tolerance=0.05, offset=0, delta=0):
-        """
-        Plot crystal field energy levels from a splitting matrix with a horizontal offset.
-        
-        Parameters:
-        - splitting_matrix: 2D numpy array, the crystal field splitting matrix to analyze.
-        - ax: matplotlib axis, optional. If provided, plots on this axis.
-        - color: str, color of the levels (e.g., 'b' for blue).
-        - label: str, optional label to identify different crystal fields.
-        - tolerance: float, maximum difference to group levels as degenerate.
-        - offset: float, horizontal offset to place the energy levels of this crystal field.
-        """
-        
-        # Sort and group nearly degenerate energy levels
-        unique_levels = []
-        grouped_levels = []
-
-        for ev in sorted(eigenvalues):
-            if not unique_levels or abs(ev - unique_levels[-1]) > tolerance:
-                unique_levels.append(ev)
-                grouped_levels.append([ev])
-            else:
-                grouped_levels[-1].append(ev)
-        
-        # Create the plot if no axis was provided
-        if ax is None:
-            fig, ax = plt.subplots()
-        
-        # Set up offsets for degenerate states
-        x_offset = 0.15  # Small offset within a group of degenerate levels
-
-        # Plot each level with offsets for degenerate states, shifted by the main offset
-        for level_group in grouped_levels:
-            energy = level_group[0]  # Common energy level for the degenerate group
-            n_deg = len(level_group)  # Number of degenerate states
-            x_positions = np.linspace(-x_offset * (n_deg - 1) / 2, x_offset * (n_deg - 1) / 2, n_deg) + offset
-
-            # Plot each degenerate level with the specified color
-            for x in x_positions:
-                ax.hlines(y=energy, xmin=x - 0.05 +delta, xmax=x + 0.05+delta, color=color, linewidth=2)
-
-        # Add label if provided
-        if label:
-            ax.text(offset + 0.22+delta, max(unique_levels) + 0.2, label, ha='center', color=color)
-
-        # Update plot appearance
-        ax.set_ylabel("Energy Levels")
-        ax.grid(axis='y', linestyle='--', alpha=0.5)
-
-        
-        ax.get_xaxis().set_visible(False)
-
-        return ax  # Return axis to allow further modifications
-
 
     # Example usage to add multiple crystal field splittings
     fig, ax = plt.subplots()
@@ -113,17 +85,12 @@ def test_CF_splitting():
     conf = 'd3'
     contributes = ['Hee', 'Hcf', 'Hso']
 
-    # from_au = 27.2113834*8065.54477
-
-    # matrix = nja.read_AILFT_orca6('test/CrF63-.out', conf, return_orcamatrix=True)
-    # matrix *= from_au
-    # print(matrix)
-
     data = nja.read_data('test/Td_cube.inp', sph_flag = False)
-    data[:,1:-1] *= 2/(2*np.sqrt(3))#*6/4
-    # data[:,-1] *= -6/4
-    # print(np.linalg.norm(data[1,1:-1]))
-    # exit()
+    data[:,1:-1] *= 2/(2*np.sqrt(3))
+
+    print(data)
+    exit()
+
     dic_Bkq = nja.calc_Bkq(data, conf, False, False)
     dic_V = nja.from_Vint_to_Bkq_2(2, dic_Bkq, reverse=True)
     matrix = np.zeros((5,5))
@@ -135,8 +102,7 @@ def test_CF_splitting():
 
     w,v = np.linalg.eigh(matrix)
 
-    #plot_CF_energy_or(w-np.min(w), tolerance=0.1)
-    plot_energy_levels(w-np.min(w), ax=ax, color='magenta', label="Td", delta=0)  
+    nja.plot_energy_levels(w-np.min(w), ax=ax, color='magenta', label="Td", delta=0)  
 
     data = nja.read_data('test/Oh_cube.inp', sph_flag = False)
     data[:,-1] *= -1
@@ -151,8 +117,7 @@ def test_CF_splitting():
 
     w,v = np.linalg.eigh(matrix)
 
-    #plot_CF_energy_or(w-np.min(w), tolerance=0.1)
-    plot_energy_levels(w-np.min(w), ax=ax, color='green', label="Oh", delta=0.5)
+    nja.plot_energy_levels(w-np.min(w), ax=ax, color='green', label="Oh", delta=0.5)
 
     plt.show()
 
@@ -446,25 +411,20 @@ def test_TanabeSugano():
     conf = 'd8'
     B = 1030
 
-    data = nja.read_data('test/Oh_cube.inp', sph_flag = False)
-    #data[:,1:-1] *= 2/(2*np.sqrt(3))
-    data[:,-1] *= -1*3
+    data = nja.read_data('test/D4h.inp', sph_flag = False)
+    data[:,-1] *= -1*0.06
 
-    calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
+    calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=True)
 
     #first point at 0 CF
     dic = nja.free_ion_param_AB(conf)
-    result = calc.MatrixH(['Hee'], **dic, eig_opt=False, wordy=False)
+    result = calc.MatrixH(['Hee', 'Hso'], **dic, eig_opt=False, wordy=False)
     proj_LS = nja.projection_basis(result[1:,:], calc.basis_l)
-    # fig, ax = plt.subplots()
-    # ax.plot(np.zeros_like(result[0,:]), result[0,:]-np.min(result[0,:]), 'o')
-    # plt.show()
 
     diagram = [(result[0,:]-np.min(result[0,:]))/B]
     x_axis = [0.0]
-    # names_list = [red_proj_LS(proj_LS)]
-    spacing = np.arange(0.01,12,0.1)
-    #print(len(spacing))
+    spacing = np.arange(0.01,12,0.2)
+    print(len(spacing))
     for i in range(len(spacing)):
         data_mult = copy.deepcopy(data)
         data_mult[:,-1] *= spacing[i]
@@ -482,9 +442,9 @@ def test_TanabeSugano():
         # names = red_proj_LS(proj_LS)
         # names_list.append(names)
         x_axis.append(-(w[0]-w[-1])/B)
-        #print(f'{i}    {x_axis[-1]/10}       ',end='\r')
+        print(f'{i}    {x_axis[-1]/10}       ',end='\r')
         dic['dic_bkq'] = dic_Bkq
-        result = calc.MatrixH(['Hee','Hcf'], **dic, eig_opt=False, wordy=False)
+        result = calc.MatrixH(['Hee','Hcf', 'Hso'], **dic, eig_opt=False, wordy=False)
         diagram.append((result[0,:]-np.min(result[0,:]))/B)
 
     diagram = np.array(diagram)
@@ -501,6 +461,8 @@ def test_TanabeSugano():
     fig, ax = plt.subplots()
     for i in range(diagram.shape[1]):
         ax.plot(np.array(x_axis)/10, diagram[:,i].real, 'k', lw=0.5)
+    plt.ylabel('E/B')
+    plt.xlabel('Dq/B')
     plt.show()
 
 @test
@@ -2170,52 +2132,52 @@ def test_conv_Vint_Bkq_d():
     assert np.allclose(result1.real, result3.real)
     assert np.allclose(result1.imag, result3.imag)
     
-# @test
-# def test_conv_Vint_Bkq_f():
+@test
+def test_conv_Vint_Bkq_f():
 
-#     conf = 'f13'
-#     contributes = ['Hee', 'Hcf', 'Hso']
+    conf = 'f13'
+    contributes = ['Hee', 'Hcf', 'Hso']
 
-#     dic = nja.read_AILFT_orca6('test/run_YbDOTA.out', conf)
-#     # pprint(dic['dic_bkq'])
-#     # dic2 = dic.copy()
+    dic = nja.read_AILFT_orca6('test/run_YbDOTA.out', conf)
+    # pprint(dic['dic_bkq'])
+    # dic2 = dic.copy()
 
-#     calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
-#     result1, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+    calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+    result1, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
     
-#     dic_V1 = nja.from_Vint_to_Bkq_2(3, dic['dic_bkq'], reverse=True)
-#     # pprint(dic_V1)
-#     dic_Bkq = nja.from_Vint_to_Bkq_2(3, nja.read_AILFT_orca6('test/run_YbDOTA.out', conf, return_V=True))
-#     # pprint(dic_Bkq)
-#     # exit()
-#     #dic_Bkq['0']['0'] = 0
-#     dic['dic_bkq'] = dic_Bkq
+    dic_V1 = nja.from_Vint_to_Bkq_2(3, dic['dic_bkq'], reverse=True)
+    # pprint(dic_V1)
+    dic_Bkq = nja.from_Vint_to_Bkq_2(3, nja.read_AILFT_orca6('test/run_YbDOTA.out', conf, return_V=True))
+    # pprint(dic_Bkq)
+    # exit()
+    #dic_Bkq['0']['0'] = 0
+    dic['dic_bkq'] = dic_Bkq
 
-#     # for k in range(0,7,2):
-#     #     for q in range(-k, k+1, 1):
-#     #         if k in dic2.keys() and q in dic2[str(int(k))].keys():
-#     #             assert dic_Bkq[str(int(k))][str(int(q))]==dic2[str(int(k))][str(int(q))]
-#     # assert dic['zeta']==dic2['zeta']
-#     # assert dic['F2']==dic2['F2']
-#     # assert dic['F4']==dic2['F4']
-#     # assert dic['F6']==dic2['F6']
-#     #pprint(dic)
+    # for k in range(0,7,2):
+    #     for q in range(-k, k+1, 1):
+    #         if k in dic2.keys() and q in dic2[str(int(k))].keys():
+    #             assert dic_Bkq[str(int(k))][str(int(q))]==dic2[str(int(k))][str(int(q))]
+    # assert dic['zeta']==dic2['zeta']
+    # assert dic['F2']==dic2['F2']
+    # assert dic['F4']==dic2['F4']
+    # assert dic['F6']==dic2['F6']
+    #pprint(dic)
     
-#     calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
-#     result2, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+    calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+    result2, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
     
-#     assert np.allclose(result1.real, result2.real, rtol=2, atol=1e-3)
-#     assert np.allclose(result1.imag, result2.imag, rtol=2, atol=1e-3)
+    assert np.allclose(result1.real, result2.real, rtol=2, atol=1e-3)
+    assert np.allclose(result1.imag, result2.imag, rtol=2, atol=1e-3)
 
-#     # remove dic_bkq from dic
-#     del dic['dic_bkq']
-#     dic['dic_V'] = dic_V1
+    # remove dic_bkq from dic
+    del dic['dic_bkq']
+    dic['dic_V'] = dic_V1
 
-#     calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
-#     result3, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+    calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+    result3, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
 
-#     assert np.allclose(result1.real, result3.real, rtol=2, atol=1e-3)
-#     assert np.allclose(result1.imag, result3.imag, rtol=2, atol=1e-3)
+    assert np.allclose(result1.real, result3.real, rtol=2, atol=1e-3)
+    assert np.allclose(result1.imag, result3.imag, rtol=2, atol=1e-3)
 
 @test
 def test_Wigner_Euler_quat():
@@ -2776,7 +2738,148 @@ def test_reduction():
     #calc.reduce_basis(conf, roots = [(21,6)], wordy=True)  #questo va cambiato.. perché probabilmente mi serve di utilizzare la J
     result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=True, ground_proj=True, return_proj=True)
 
+def test_newVLF():
     
+    q = np.sqrt((2*2+1)/(4*np.pi))*7*nja.Wigner_coeff.threej_symbol([[3,2,3],[0,0,0]])*nja.Wigner_coeff.threej_symbol([[3,2,3],[0,0,0]])
+    print(q)
+
+def eigenfunction_optimization_grid():
+
+    def opt_eigenfunction_SIMPRE(calc, dic_Bkq):
+
+        import time
+
+        def use_nja_(calc, dic, wordy=False):
+            result = calc.MatrixH(['Hcf'], **dic, eig_opt=False, wordy=wordy)
+            ground_state = np.abs(result[1:,0])**2
+            or_ground_state = np.sort(ground_state)
+            return or_ground_state
+        
+        dict, coeff = nja.read_DWigner_quat()
+
+        x = np.zeros(16)
+        x[-1] = 1
+
+        target_list = []
+
+        start_time = time.time()
+
+        angles_list = []
+        for i,a1 in enumerate(np.arange(0,360,30)):
+            for j,a2 in enumerate(np.arange(0,180,30)):
+                for k,a3 in enumerate(np.arange(0,360,30)):
+                    #print(a1,a2,a3)
+                    angles = [a1,a2,a3]
+                    angles_list.append(angles)
+                    a = angles[0]
+                    b = angles[1]
+                    c = angles[2]
+
+                    r = scipy.spatial.transform.Rotation.from_euler('ZYZ', [c,b,a], degrees=True)
+                    R = r.as_quat()
+                    quat = [R[-1], R[0], R[1], R[2]]
+
+                    dic_rot = nja.rota_LF_quat(calc.l, dic_Bkq, quat, dict, coeff)
+                    dic = {'dic_bkq': dic_rot}
+                    
+                    ground_comp = use_nja_(calc, dic, wordy=False)
+
+                    target = np.sum((np.abs(ground_comp-x))**2)
+                    target_list.append(target)
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Opt time: {elapsed_time:.2f} seconds"+'\n')
+
+        target_list = np.array(target_list)
+        angles_list = np.array(angles_list)
+
+        min_index = np.argmin(target_list)
+        angles = angles_list[min_index,:]
+        aopt = angles[0]
+        bopt = angles[1]
+        copt = angles[2]
+
+        target_list = []
+
+        start_time = time.time()
+
+        angles_list = []
+        for i,a1 in enumerate(np.arange(aopt-20,aopt+20,1)):
+            for j,a2 in enumerate(np.arange(bopt-20,bopt+20,1)):
+                for k,a3 in enumerate(np.arange(copt-20,copt+20,1)):
+                    #print(a1,a2,a3)
+                    angles = [a1,a2,a3]
+                    angles_list.append(angles)
+                    a = angles[0]
+                    b = angles[1]
+                    c = angles[2]
+
+                    r = scipy.spatial.transform.Rotation.from_euler('ZYZ', [c,b,a], degrees=True)
+                    R = r.as_quat()
+                    quat = [R[-1], R[0], R[1], R[2]]
+
+                    dic_rot = nja.rota_LF_quat(calc.l, dic_Bkq, quat, dict, coeff)
+                    dic = {'dic_bkq': dic_rot}
+                    
+                    ground_comp = use_nja_(calc, dic, wordy=False)
+
+                    target = np.sum((np.abs(ground_comp-x))**2)
+                    target_list.append(target)
+
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Opt time: {elapsed_time:.2f} seconds"+'\n')
+
+        target_list = np.array(target_list)
+        angles_list = np.array(angles_list)
+
+        min_index = np.argmin(target_list)
+        angles = angles_list[min_index,:]
+        a = angles[0]
+        b = angles[1]
+        c = angles[2]
+
+        r = scipy.spatial.transform.Rotation.from_euler('ZYZ', [c,b,a], degrees=True)
+        R = r.as_quat()
+        quat = [R[-1], R[0], R[1], R[2]]
+        dic_rot = nja.rota_LF_quat(calc.l, dic_Bkq, quat, dict, coeff)
+
+        return dic_rot, quat
+
+    conf = 'f9'
+
+    data = nja.read_data('test/beta.inp', sph_flag = False)
+    data[:,-1] *= -1
+    dic_Bkq = nja.calc_Bkq(data, conf)
+    dict, coeff = nja.read_DWigner_quat()
+    calc = nja.calculation(conf, ground_only=True, TAB=True, wordy=False)
+
+    dic_rot, quat = opt_eigenfunction_SIMPRE(calc, dic_Bkq)
+
+    dic = {'dic_bkq': dic_rot}
+    _,_ = calc.MatrixH(['Hcf'], **dic, eig_opt=False, wordy=True, ground_proj=True, return_proj=True)
+
+
+def eigenfunction_optimization_opt():
+
+    conf = 'f9'
+
+    data = nja.read_data('test/bbpn.inp', sph_flag = False)
+    data[:,-1] *= -1
+    dic_Bkq = nja.calc_Bkq(data, conf)
+    calc = nja.calculation(conf, ground_only=True, TAB=True, wordy=False)
+
+    #dic_rot, quat = nja.calculation.opt_eigenfunction_minimization(3, calc, dic_Bkq)
+
+    dic = {'dic_bkq': dic_Bkq}
+    # dic_Aqkrk = nja.from_Aqkrk_to_Bkq(dic_rot, revers=True)
+    # pprint(dic_Aqkrk)
+    _,_ = calc.MatrixH(['Hcf'], **dic, eig_opt=True, wordy=True, ground_proj=True, return_proj=True)
+
+
+
+
 if __name__ == '__main__':
 
     #### test graphical representations
@@ -2791,30 +2894,32 @@ if __name__ == '__main__':
     # test_tables_d()
     # test_energy_allconf_f()     #f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13 (takes 3:30 h with clean RAM)
     # test_tables_f()
-    test_conv_AqkrkBkq() #f11
-    test_conv_Vint_Bkq_d() #d8
-    test_PCM() #f9
-    test_PCM_2() #f10
-    test_StevensfromMOLCAS #f9
-    test_Wigner_Euler_quat()
-    test_Wigner_Euler_quat2()
-    test_LF_rotation_euler()
-    test_LF_rotation_quat()
-    test_mag_moment()  #d1
-    test_mag_moment2()  #f9
-    test_M_vector()  #d3
-    test_M_vector2()  #d9
-    test_gtensor()  #f13
-    test_susceptibility_B_ord1()  #d8
-    test_susceptibility_B_ord1_2()  #d8
-    test_susceptibility_B_ord1_3()  #f9
-    test_susceptibility_B_ord1_4()  #f2
-    test_calc_susceptibility_zerofield()  #d8
-    test_torque()
+    # test_conv_AqkrkBkq() #f11
+    # test_conv_Vint_Bkq_d() #d8
+    # test_PCM() #f9
+    # test_PCM_2() #f10
+    # test_StevensfromMOLCAS #f9
+    # test_Wigner_Euler_quat()
+    # test_Wigner_Euler_quat2()
+    # test_LF_rotation_euler()
+    # test_LF_rotation_quat()
+    # test_mag_moment()  #d1
+    # test_mag_moment2()  #f9
+    # test_M_vector()  #d3
+    # test_M_vector2()  #d9
+    # test_gtensor()  #f13
+    # test_susceptibility_B_ord1()  #d8
+    # test_susceptibility_B_ord1_2()  #d8
+    # test_susceptibility_B_ord1_3()  #f9
+    # test_susceptibility_B_ord1_4()  #f2
+    # test_calc_susceptibility_zerofield()  #d8
+    # test_torque()
 
     #### on development
+    eigenfunction_optimization_grid()
     # test_reduction()
     # test_conv_Vint_Bkq_f() #f13
+    # test_newVLF()
 
     #### not real tests
     # test_calc_ee_int_f()
