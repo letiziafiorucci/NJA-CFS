@@ -11,6 +11,8 @@ OctoYot/
 !Oh_dist.inp
 !cfp_*_conf.txt
 !test/complete_matrices/d*.txt
+!test/*.inp
+NJA-manuscript*
 my_test_nja.py
 simpre.par
 simpre.dat

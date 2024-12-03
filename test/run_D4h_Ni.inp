@@ -1,0 +1,36 @@
+DKH2 DKH-DEF2-TZVP AutoAux TightSCF
+
+%maxcore 14000
+
+%casscf
+ nel 8
+ norb 5
+ mult 3, 1
+ nroots 10, 15
+ trafostep RI
+ etol 1e-7
+ actorbs dorbs
+ nevpt2 sc
+ printlevel 3
+ maxiter 200
+ rel
+  dosoc true
+  gtensor true
+  dosusceptibility true
+  SUSTempMIN 290.0
+  SUSTempMAX 300.0
+  SUSNPoints 310
+  SUSStatFieldMIN 1000.0
+  SUSStatFieldMAX 190000.0
+  SUSStatFieldNPoints 2
+  printlevel 3
+ end
+end
+
+*xyz 2 1
+Q    1.0   0.0   0.0
+Q    -1.0   0.0   0.0
+Q    0.0   1.0   0.0
+Q    0.0   -1.0   0.0
+Ni   0.0   0.0   0.0
+*
