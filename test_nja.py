@@ -2890,33 +2890,33 @@ if __name__ == '__main__':
     # test_plot_magnetization_field()
 
     #### actual tests
-    # test_energy_allconf_d()     #d2, d3, d4, d5, d6, d7, d8, d9
-    # test_tables_d()
+    test_energy_allconf_d()     #d2, d3, d4, d5, d6, d7, d8, d9
+    test_tables_d()
     # test_energy_allconf_f()     #f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13 (takes 3:30 h with clean RAM)
     # test_tables_f()
-    # test_conv_AqkrkBkq() #f11
-    # test_conv_Vint_Bkq_d() #d8
-    # test_PCM() #f9
-    # test_PCM_2() #f10
-    # test_StevensfromMOLCAS #f9
-    # test_Wigner_Euler_quat()
-    # test_Wigner_Euler_quat2()
-    # test_LF_rotation_euler()
-    # test_LF_rotation_quat()
-    # test_mag_moment()  #d1
-    # test_mag_moment2()  #f9
-    # test_M_vector()  #d3
-    # test_M_vector2()  #d9
-    # test_gtensor()  #f13
-    # test_susceptibility_B_ord1()  #d8
-    # test_susceptibility_B_ord1_2()  #d8
-    # test_susceptibility_B_ord1_3()  #f9
-    # test_susceptibility_B_ord1_4()  #f2
-    # test_calc_susceptibility_zerofield()  #d8
-    # test_torque()
+    test_conv_AqkrkBkq() #f11
+    test_conv_Vint_Bkq_d() #d8
+    test_PCM() #f9
+    test_PCM_2() #f10
+    test_StevensfromMOLCAS #f9
+    test_Wigner_Euler_quat()
+    test_Wigner_Euler_quat2()
+    test_LF_rotation_euler()
+    test_LF_rotation_quat()
+    test_mag_moment()  #d1
+    test_mag_moment2()  #f9
+    test_M_vector()  #d3
+    test_M_vector2()  #d9
+    test_gtensor()  #f13
+    test_susceptibility_B_ord1()  #d8
+    test_susceptibility_B_ord1_2()  #d8
+    test_susceptibility_B_ord1_3()  #f9
+    test_susceptibility_B_ord1_4()  #f2
+    test_calc_susceptibility_zerofield()  #d8
+    test_torque()
 
     #### on development
-    eigenfunction_optimization_grid()
+    # eigenfunction_optimization_grid()
     # test_reduction()
     # test_conv_Vint_Bkq_f() #f13
     # test_newVLF()
