@@ -1199,7 +1199,7 @@ class calculation():
 
         return dic_cfp, tables, dic_LS_almost, dic_ee
 
-    def reduce_basis(self, conf, dic=None, contributes=None, roots = None, wordy=False):
+    def reduce_basis_old(self, conf, dic=None, contributes=None, roots = None, wordy=False):
         # reduce the basis set according to spin multiplicity
         # for dN configurations the Hund's rules are applied
         # for fN configurations the weak field - High Spin situation is considered and 
@@ -1281,7 +1281,7 @@ class calculation():
             if dic is None:
                 dic = free_ion_param_f_HF(conf)
             if contributes is None:
-                matrix = self.build_matrix(['Hee'], **dic)
+                matrix = self.build_matrix(['Hee', 'Hso'], **dic)
             else:
                 matrix = self.build_matrix(contributes, **dic)
 
@@ -1289,10 +1289,26 @@ class calculation():
             v = np.round(v, 16)  #numbers are saved as complex128 data type
             result = np.vstack((w,v))
             result = np.copy(result[:, result[0,:].argsort()])
-            #Gram-Schmidt orthogonalization of the eigenvectors
-            result[1:,:] = gram_schmidt(result[1:,:])
-            projected = projection_basis(result[1:,:], self.basis_l, J_label=True)  #this gives just the order of spectroscopic terms of the free ion
+            print(result[0,:].real-np.min(result[0,:].real))
 
+            energy_print = np.around(result[0,:].real-np.min(result[0,:].real),8)
+            energy_list, energy_count = np.unique(energy_print, return_counts=True)
+            for i in range(len(energy_list)):
+                if energy_count[i]!=1:
+                    deg_str = f' ({energy_count[i]})'
+                else:
+                    deg_str = ''
+                print(f' {energy_list[i]:10.3f}'+deg_str+'\n' if wordy else "", end = "")
+
+            #Gram-Schmidt orthogonalization of the eigenvectors
+            #result[1:,:] = gram_schmidt(result[1:,:])
+            projected = projection_basis(result[1:,:], self.basis_l, J_label=True)  #this gives just the order of spectroscopic terms of the free ion
+            pprint(projected[1])
+            pprint(projected[16])
+            pprint(projected[30])
+            pprint(projected[42])
+            pprint(projected[52])
+            # exit()
             max_proj = []
             for i in projected.keys():
                 s_proj = projected[i]
@@ -1316,10 +1332,141 @@ class calculation():
         for i in range(len(roots)):
             for j in range(len(max_proj)):
                 if nroots[i] < roots[i][0]*roots[i][1] and int(max_proj[j][0])==roots[i][1]:
-                    # print(nroots[i], roots[i][0]*roots[i][1], int(max_proj[j][0]), roots[i][1], max_proj[j])
+                    print(nroots[i], roots[i][0]*roots[i][1], int(max_proj[j][0]), roots[i][1], max_proj[j])
                     nroots[i] += (eval(max_proj[j][max_proj[j].index('(')+1:max_proj[j].index(')')]))*2 +1 #eval(max_proj[j][0])*(2*state_legend(max_proj[j][1])+1) #
                     basis_update, basis_l_update, basis_l_JM_update, basis_proj, dic_LS_proj, basis_l_proj, basis_l_JM_proj = state_select(max_proj[j], basis_update, basis_l_update, basis_l_JM_update)
                     # print(basis_l_proj)
+                    if basis_update.size > 0:
+                        if i==0 and 'basis_red' not in locals():
+                            basis_red = np.copy(basis_proj)
+                            dic_LS_red = dic_LS_proj.copy()
+                            basis_l_red = basis_l_proj.copy()
+                            basis_l_JM_red = basis_l_JM_proj.copy()
+                        else:
+                            basis_red = np.vstack((basis_red, basis_proj))
+                            dic_LS_red.update(dic_LS_proj)
+                            basis_l_red += basis_l_proj
+                            basis_l_JM_red += basis_l_JM_proj
+
+        self.basis, self.dic_LS, self.basis_l, self.basis_l_JM = basis_red, dic_LS_red, basis_l_red, basis_l_JM_red
+
+        exit()
+
+        print('Calculation on reduced set\nBasis set reduced to: '+str(self.basis.shape[0])+'\n' if wordy else "", end = "")
+
+    def reduce_basis(self, conf, dic=None, contributes=None, roots = None, wordy=False):
+        # reduce the basis set according to spin multiplicity
+        # for dN configurations the Hund's rules are applied
+        # for fN configurations the weak field - High Spin situation is considered and 
+        # default parameters are taken from Ma, C. G., Brik, M. G., Li, Q. X., & Tian, Y. (2014) Journal of alloys and compounds, 599, 93-101.
+
+        # basis --> array: n. microstates x [2S, L, 2J, 2M, sen]
+        # dic_LS --> dict: '[2S, L, 2J, 2M, sen (,count)]': label as N. and K.
+        # basis_l --> list: 2S+1 L (J)
+        # basis_l_JM --> list: 2S+1 L (J) MJ
+
+        print('Performing basis reduction... \n' if wordy else "", end = "")
+
+        def state_select(ground, basis, basis_l, basis_l_JM):
+
+            term_num = [(int(ground[0])-1), state_legend(ground[1])]#, eval(ground[ground.index('(')+1:ground.index(')')])*2]
+            basis_new = []
+            basis_l_red = []
+            basis_l_JM_red = []
+            dic_LS_red = {}
+            for ii in range(basis.shape[0]):
+                if np.equal(basis[ii,:len(term_num)],term_num).all():
+                    # print(basis[ii,:], term_num, basis_l[ii], basis_l_JM[ii])
+                    if list(basis[ii]) not in basis_new:
+                        basis_new.append(list(basis[ii]))
+                        lista = list(basis[ii])
+                        dic_LS_red[':'.join(f'{n}' for n in lista)]=self.dic_LS[':'.join(f'{n}' for n in lista)]
+                        basis_l_red.append(basis_l[ii])
+                        basis_l_JM_red.append(basis_l_JM[ii])
+            basis_new = np.array(basis_new)
+            
+            basis_update = []
+            basis_l_update = []
+            basis_l_JM_update = []
+            for ii in range(basis.shape[0]):
+                if not any((basis[ii] == x).all() for x in basis_new):
+                    basis_update.append(list(basis[ii]))
+                    basis_l_update.append(basis_l[ii])
+                    basis_l_JM_update.append(basis_l_JM[ii])
+            basis_update = np.array(basis_update)
+
+            return basis_update, basis_l_update, basis_l_JM_update, basis_new, dic_LS_red, basis_l_red, basis_l_JM_red
+
+        # the basis must be complete
+        if self.ground:
+            raise ValueError("Basis set reduction not allowed in ground-only calculation on "+conf+" configuration")
+
+        if conf[0]=='d':  # dN configurations follows Hund's rule
+            basis_states = self.basis[:, :3]
+            max_proj = np.unique(basis_states, axis=0)
+            if int(conf[1:])>5:
+                indices = np.lexsort((-max_proj[:, 2], -max_proj[:, 1], -max_proj[:, 0]))
+            else:
+                indices = np.lexsort((max_proj[:, 2], -max_proj[:, 1], -max_proj[:, 0]))  #the last one is the first criteria
+            max_proj = max_proj[indices]
+        else:   # fN configurations are in the weak field - High Spin situation
+            #copia i parametri e fai l'hamiltoniano con solo i contributi di Hee e Hso
+            #(l'implementazione sotto dovrebbe andare bene)
+
+            if dic is None:
+                dic = free_ion_param_f_HF(conf)
+            if contributes is None:
+                matrix = self.build_matrix(['Hee'], **dic)
+            else:
+                matrix = self.build_matrix(contributes, **dic)
+
+            w,v = diagonalisation(matrix)
+            v = np.round(v, 16)  #numbers are saved as complex128 data type
+            result = np.vstack((w,v))
+            result = np.copy(result[:, result[0,:].argsort()])
+            print(result[0,:].real-np.min(result[0,:].real))
+
+            # energy_print = np.around(result[0,:].real-np.min(result[0,:].real),8)
+            # energy_list, energy_count = np.unique(energy_print, return_counts=True)
+            # for i in range(len(energy_list)):
+            #     if energy_count[i]!=1:
+            #         deg_str = f' ({energy_count[i]})'
+            #     else:
+            #         deg_str = ''
+            #     print(f' {energy_list[i]:10.3f}'+deg_str+'\n' if wordy else "", end = "")
+
+            projected = projection_basis(result[1:,:], self.basis_l)  #this gives just the order of spectroscopic terms of the free ion
+
+            max_proj = []
+            for i in projected.keys():
+                s_proj = projected[i]
+                dlabel = list(s_proj.keys())
+                dvalue = np.array(list(s_proj.values()))
+                # max_proj.append(the_highest_L(s_proj, conf[0]+str(self.n))[0])   #corresponding conf for almost-closed
+                max_proj.append(dlabel[dvalue.argmax()])
+
+            unique_max_proj = []
+            for item in max_proj:
+                if item not in unique_max_proj:
+                    unique_max_proj.append(item)
+            max_proj = unique_max_proj
+
+        basis_update = np.copy(self.basis)
+        basis_l_update = np.copy(self.basis_l)
+        basis_l_JM_update = np.copy(self.basis_l_JM)
+        nroots = np.zeros(len(roots))
+        # print('nroots', nroots)
+        for i in range(len(roots)):
+            for j in range(len(max_proj)):
+                if nroots[i] < roots[i][0]*roots[i][1] and int(max_proj[j][0])==roots[i][1]:
+                    # print('max_proj[j]', max_proj[j])
+                    # print(nroots[i], roots[i][0]*roots[i][1], int(max_proj[j][0]), roots[i][1], max_proj[j])
+                    # print('nroots[i] += ', eval(max_proj[j][0])*(2*state_legend(max_proj[j][1])+1))
+                    nroots[i] += eval(max_proj[j][0])*(2*state_legend(max_proj[j][1])+1) #(eval(max_proj[j][max_proj[j].index('(')+1:max_proj[j].index(')')]))*2 +1 #eval(max_proj[j][0])*(2*state_legend(max_proj[j][1])+1) #
+                    basis_update, basis_l_update, basis_l_JM_update, basis_proj, dic_LS_proj, basis_l_proj, basis_l_JM_proj = state_select(max_proj[j], basis_update, basis_l_update, basis_l_JM_update)
+                    # print(np.unique(basis_l_proj))
+                    # print('basis_update.size ', basis_update.size)
+                    
                     if basis_update.size > 0:
                         if i==0 and 'basis_red' not in locals():
                             basis_red = np.copy(basis_proj)
@@ -1363,7 +1510,7 @@ class calculation():
 
         if eig_opt:
             print('\nWavefunction optimization...')
-            dic_bkq, quat = self.opt_eigenfunction_minimization(self.l, self, dic_bkq)
+            dic_bkq, quat = self.opt_eigenfunction_minimization(self, dic_bkq, self.basis.shape[0])
             print('...done')
             print('CFP rotation quaternion: ', quat)
         elif not eig_opt and cfp_angles is not None and len(cfp_angles)==3:
@@ -1534,7 +1681,7 @@ class calculation():
         return matrix
 
     @staticmethod
-    def opt_eigenfunction_minimization(calc, dic_Bkq):
+    def opt_eigenfunction_minimization(calc, dic_Bkq, shape):
 
         from scipy.optimize import dual_annealing
         from scipy.optimize import least_squares
@@ -1558,7 +1705,7 @@ class calculation():
         
         dict, coeff = read_DWigner_quat()
 
-        x = np.zeros(16)
+        x = np.zeros(shape)
         x[-1] = 100
 
         start_time = time.time()
@@ -1578,7 +1725,7 @@ class calculation():
         return dic_rot, quat
 
     @staticmethod
-    def opt_eigenfunction_grid(calc, dic_Bkq):
+    def opt_eigenfunction_grid(calc, dic_Bkq, shape):
 
         import time
 
@@ -1590,7 +1737,7 @@ class calculation():
         
         dict, coeff = read_DWigner_quat()
 
-        x = np.zeros(16)
+        x = np.zeros(shape)
         x[-1] = 1
 
         rep_cryst = np.array(crystdat.rep678_cryst)
@@ -1948,12 +2095,12 @@ def M_vector(field_vec, mu_matrix, LF_matrix, basis, temp):
     M = np.zeros(3, dtype="float64")
 
     for kk in range(3):
-        CI=1
+
         den = 0
         num = 0
         for ii in range(len(E)):
 
-            mu_single = np.dot(np.conj(np.ascontiguousarray(result[1:, ii]).T), np.dot(CI * mu_matrix[kk, ...], np.ascontiguousarray(result[1:, ii])))
+            mu_single = np.dot(np.conj(np.ascontiguousarray(result[1:, ii]).T), np.dot(mu_matrix[kk, ...], np.ascontiguousarray(result[1:, ii])))
 
             if np.abs(mu[ii,kk].imag)<1e-9:
                 mu[ii,kk] += mu_single.real
@@ -2105,13 +2252,78 @@ def calc_torque(B0, T, LF_matrix, basis, plane='xz', step=3.1415/40, figure=Fals
 
     return angles, np.array(tau_vecs)
 
+def susceptibility_field(fields, temp, basis, LF_matrix, delta=0.001):
+
+    kB = 1.380649e-23
+    mu0 = 1.25663706212e-06
+    muB = 0.4668517532494337
+
+    M_list = np.zeros(fields.shape[0])
+    susc_list = np.zeros(fields.shape[0])
+    mu = np.zeros((fields.shape[0], basis.shape[0], 3), dtype='complex128')
+
+    mu_matrix = mag_moment(basis)
+
+    for i in range(fields.shape[0]): 
+
+        matrix = add_Zeeman(fields[i], basis, LF_matrix)
+        result = from_matrix_to_result_copy(matrix)
+        E = (result[0,:].real-min(result[0,:].real)) #* 1.9865e-23   
+
+        den = 0
+        num = 0
+        for ii in range(len(E)):
+            for kk in range(3):
+                mu_single = np.dot(np.conj(result[1:,ii]).T, np.dot(mu_matrix[kk,...],result[1:,ii]))
+                mu[i,ii,0] += np.copy(mu_single.real)
+
+            num += np.real(mu[i,ii,0]*np.exp(-E[ii]/(kB/1.9865e-23*temp)))
+            den += np.real(np.exp(-E[ii]/(kB/1.9865e-23*temp)))
+        E_av = num/den
+
+        B_inc = fields[i]/np.linalg.norm(fields[i])*delta
+        matrix = add_Zeeman(fields[i]+B_inc, basis, LF_matrix)
+        result = from_matrix_to_result_copy(matrix)
+        E = (result[0,:].real-min(result[0,:].real)) 
+        den = 0
+        num = 0
+        for ii in range(len(E)):
+            for kk in range(3):
+                mu_single = np.dot(np.conj(result[1:,ii]).T, np.dot(mu_matrix[kk,...],result[1:,ii]))
+                mu[i,ii,1] += np.copy(mu_single.real)
+
+            num += np.real(mu[i,ii,1]*np.exp(-E[ii]/(kB/1.9865e-23*temp)))
+            den += np.real(np.exp(-E[ii]/(kB/1.9865e-23*temp)))
+        E_av_inc = num/den
+
+        B_inc = fields[i]/np.linalg.norm(fields[i])*delta
+        matrix = add_Zeeman(fields[i]-B_inc, basis, LF_matrix)
+        result = from_matrix_to_result_copy(matrix)
+        result = from_matrix_to_result(matrix)
+        E = (result[0,:].real-min(result[0,:].real)) 
+        den = 0
+        num = 0
+        for ii in range(len(E)):
+            for kk in range(3):
+                mu_single = np.dot(np.conj(result[1:,ii]).T, np.dot(mu_matrix[kk,...],result[1:,ii]))
+                mu[i,ii,2] += np.copy(mu_single.real)
+
+            num += np.real(mu[i,ii,2]*np.exp(-E[ii]/(kB/1.9865e-23*temp)))
+            den += np.real(np.exp(-E[ii]/(kB/1.9865e-23*temp)))
+        E_av_incm = num/den
+
+        M_list[i] = E_av*muB*1.9865e-23
+        susc_list[i] = (E_av_inc - E_av_incm)/(2*delta)*mu0*muB*1.9865e-23
+
+    return M_list, susc_list
+
 #======================= MAGNETIC PROPERTIES ==============================
 
 class Magnetics():
 
     def __init__(self, calc, contributes, par):
 
-        self.result = calc.MatrixH(contributes, **par)
+        self.result = calc.MatrixH(contributes, **par, wordy=True)
         self.par_dict = calc.par_dict
 
         self.calc = calc
@@ -2225,78 +2437,73 @@ class Magnetics():
 
         M_list = np.zeros(fields.shape[0])
         susc_list = np.zeros(fields.shape[0])
-        mu = np.zeros((fields.shape[0], self.basis.shape[0], 2), dtype='complex128')
+        mu = np.zeros((fields.shape[0], self.basis.shape[0], 3), dtype='complex128')
 
         mu_matrix = self.mag_moment(1)
 
-        for i in range(fields.shape[0]):  #calcolo un tensore per campo
+        for i in range(fields.shape[0]): 
             print(str(i)+' FIELD: '+str(fields[i])+'\n' if wordy else "", end = "")
 
-            par['field'] = fields[i]  #se ci metto abs viene come OctoYot
+            par['field'] = fields[i] 
             weights = fields[i]/np.linalg.norm(fields[i])
-            matrix = self.calc.build_matrix(self.Hterms, **par)  #mi calcolo energia e autovalori ad un certo campo
+            matrix = self.calc.build_matrix(self.Hterms, **par) 
             result = from_matrix_to_result(matrix)
-            E = (result[0,:].real-min(result[0,:].real)) * 1.9865e-23   # per convertire da cm-1 a J
-            # print(E/1.9865e-23)
-            # exit()
+            E = (result[0,:].real-min(result[0,:].real)) #* 1.9865e-23   
 
             den = 0
             num = 0
             for ii in range(len(E)):
                 for kk in range(3):
-                    CI=1
-                    mu_single = np.dot(np.conj(result[1:,ii]).T, np.dot(CI*mu_matrix[kk,...],result[1:,ii]))
+                    mu_single = np.dot(np.conj(result[1:,ii]).T, np.dot(mu_matrix[kk,...],result[1:,ii]))
                     if np.abs(np.copy(mu_single).imag)<1e-9:
                         mu[i,ii,0] += np.copy(mu_single.real)*weights[kk]
                     else:
                         print('complex')
 
-                num += np.real(mu[i,ii,0]*np.exp(-E[ii]/(self.kB*temp)))
-                den += np.real(np.exp(-E[ii]/(self.kB*temp)))
+                num += np.real(mu[i,ii,0]*np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
+                den += np.real(np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
             E_av = num/den
 
             B_inc = fields[i]/np.linalg.norm(fields[i])*delta
             par['field'] = fields[i]+B_inc
-            matrix = self.calc.build_matrix(self.Hterms, **par)  #mi calcolo energia e autovalori ad un certo campo
+            matrix = self.calc.build_matrix(self.Hterms, **par)  
             result = from_matrix_to_result(matrix)
-            E = (result[0,:].real-min(result[0,:].real)) * 1.9865e-23   # per convertire da cm-1 a J
+            E = (result[0,:].real-min(result[0,:].real)) #* 1.9865e-23   # per convertire da cm-1 a J
             den = 0
             num = 0
             for ii in range(len(E)):
                 for kk in range(3):
-                    CI=1
-                    mu_single = np.dot(np.conj(result[1:,ii]).T, np.dot(CI*mu_matrix[kk,...],result[1:,ii]))
+                    mu_single = np.dot(np.conj(result[1:,ii]).T, np.dot(mu_matrix[kk,...],result[1:,ii]))
                     if np.abs(np.copy(mu_single).imag)<1e-9:
                         mu[i,ii,1] += np.copy(mu_single.real)*weights[kk]
                     else:
                         print('complex')
 
-                num += np.real(mu[i,ii,1]*np.exp(-E[ii]/(self.kB*temp)))
-                den += np.real(np.exp(-E[ii]/(self.kB*temp)))
+                num += np.real(mu[i,ii,1]*np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
+                den += np.real(np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
             E_av_inc = num/den
 
             B_inc = fields[i]/np.linalg.norm(fields[i])*delta
             par['field'] = fields[i]-B_inc
-            matrix = self.calc.build_matrix(self.Hterms, **par)  #mi calcolo energia e autovalori ad un certo campo
+            matrix = self.calc.build_matrix(self.Hterms, **par)  
             result = from_matrix_to_result(matrix)
-            E = (result[0,:].real-min(result[0,:].real)) * 1.9865e-23   # per convertire da cm-1 a J
+            E = (result[0,:].real-min(result[0,:].real)) #* 1.9865e-23   # per convertire da cm-1 a J
             den = 0
             num = 0
             for ii in range(len(E)):
                 for kk in range(3):
-                    CI=1
-                    mu_single = np.dot(np.conj(result[1:,ii]).T, np.dot(CI*mu_matrix[kk,...],result[1:,ii]))
+                    mu_single = np.dot(np.conj(result[1:,ii]).T, np.dot(mu_matrix[kk,...],result[1:,ii]))
                     if np.abs(np.copy(mu_single).imag)<1e-9:
-                        mu[i,ii,1] += np.copy(mu_single.real)*weights[kk]
+                        mu[i,ii,2] += np.copy(mu_single.real)*weights[kk]
                     else:
                         print('complex')
 
-                num += np.real(mu[i,ii,1]*np.exp(-E[ii]/(self.kB*temp)))
-                den += np.real(np.exp(-E[ii]/(self.kB*temp)))
+                num += np.real(mu[i,ii,2]*np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
+                den += np.real(np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
             E_av_incm = num/den
 
-            M_list[i] = E_av*self.muB
-            susc_list[i] = (E_av_inc - E_av_incm)/(2*delta)*self.mu0*self.muB**2
+            M_list[i] = E_av*self.muB*1.9865e-23
+            susc_list[i] = (E_av_inc - E_av_incm)/(2*delta)*self.mu0*self.muB*1.9865e-23
 
             print('M '+str(M_list[i])+'\n' if wordy else "", end = "")
             print('chi '+str(susc_list[i])+'\n' if wordy else "", end = "")
@@ -3381,7 +3588,7 @@ def calc_Aqkrk(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
         Aqkrk[f'{k}'] = {}
         r_val = r_expect(str(k), conf)
         for q in range(-k,k+1):
-            pref = plm(k,np.abs(q))*(4*np.pi/(2*k+1))#**(0.5)
+            pref = plm(k,np.abs(q))*(4*np.pi/(2*k+1))
             somma = 0
             for i in range(data.shape[0]):
                 sphharmp = scipy.special.sph_harm(np.abs(q), k, coord_sph[i,2],coord_sph[i,1])  #sph_harm(k,q,coord_sph[i,1], coord_sph[i,2])/np.sqrt(4*np.pi/(2*k+1))
@@ -4935,7 +5142,7 @@ def sigma_k(k, conf):
         k = str(k)
 
     if conf[0] == 'd':
-        raise NotImplementedError("Stevens coefficients for d^n configurations are not implemented.")
+        raise NotImplementedError("Sternheimer shielding parameters for d^n configurations are not implemented.")
 
     legenda = {'2':{'f1':0.510, 'f2':0.515, 'f3':0.518, 'f4':0.519, 'f5':0.519, 'f6':0.520, 'f7':0.521, 'f8':0.523, 'f9':0.527, 'f10':0.534, 'f11':0.544, 'f12':0.554, 'f13':0.571},
                '4':{'f1':0.0132, 'f2':0.0138, 'f3':0.0130, 'f4':0.0109, 'f5':0.0077, 'f6':0.0033, 'f7':-0.0031, 'f8':-0.0107, 'f9':-0.0199, 'f10':-0.0306, 'f11':-0.0427, 'f12':-0.0567, 'f13':-0.0725},
@@ -5567,9 +5774,6 @@ def read_AILFT_orca6(filename, conf, method='CASSCF', return_V=False, rotangle_V
             '61':matrix[5,0]*from_au,'62':matrix[5,1]*from_au,'63':matrix[5,2]*from_au,'64':matrix[5,3]*from_au,'65':matrix[5,4]*from_au,'66':matrix[5,5]*from_au,
             '71':matrix[6,0]*from_au,'72':matrix[6,1]*from_au,'73':matrix[6,2]*from_au,'74':matrix[6,3]*from_au,'75':matrix[6,4]*from_au,'76':matrix[6,5]*from_au,'77':matrix[6,6]*from_au
         }
-
-        #pprint(dic_V)
-        #exit()
         
         dic_Bkq = from_Vint_to_Bkq(dic_V, conf)
         dic['dic_bkq'] = dic_Bkq

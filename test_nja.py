@@ -2718,6 +2718,18 @@ def test_calc_susceptibility_zerofield():
         if np.abs(np.round(ratio[i],16)) > 0:
             assert np.round(ratio[i], 2) == 1.0
 
+@test
+def test_reduction():
+
+    conf = 'f9'
+    contributes = ['Hee','Hso','Hcf']
+    dic = nja.read_AILFT_orca6('test/run_DOTA1_21sextets.out', conf)
+
+    calc = nja.calculation(conf, ground_only=False, TAB=False)
+    calc.reduce_basis(conf, roots = [(21,6)])  
+    result, _ = calc.MatrixH(contributes, **dic, ground_proj=True, return_proj=True)
+
+    assert result.shape[1]==126
 
 if __name__ == '__main__':
 
@@ -2729,8 +2741,8 @@ if __name__ == '__main__':
     # test_plot_magnetization_field()
 
     #### actual tests
-    test_energy_allconf_d()     #d2, d3, d4, d5, d6, d7, d8, d9
-    test_tables_d()
+    # test_energy_allconf_d()     #d2, d3, d4, d5, d6, d7, d8, d9
+    # test_tables_d()
     # test_energy_allconf_f()     #f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13 (takes 3:30 h with clean RAM)
     # test_tables_f()
     test_conv_AqkrkBkq() #f11
@@ -2753,6 +2765,7 @@ if __name__ == '__main__':
     test_susceptibility_B_ord1_4()  #f2
     test_calc_susceptibility_zerofield()  #d8
     test_torque()
+    test_reduction()
 
     
     

@@ -3,6 +3,7 @@ test/complete_matrices/input*
 BKQ.ods
 *.pdf
 *.png
+test/*.png
 __pycache__/
 OctoYot/
 *.txt 
