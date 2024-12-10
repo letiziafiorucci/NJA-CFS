@@ -2,6 +2,8 @@ test/simpre/*
 test/complete_matrices/input*
 BKQ.ods
 *.pdf
+!docs/*
+*.bak
 *.png
 test/*.png
 __pycache__/
