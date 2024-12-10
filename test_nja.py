@@ -1284,6 +1284,189 @@ def eigenfunction_optimization_opt():
 
     #check with susceptibility and eigenfunction composition
 
+def comparison_exp_chi():
+    #this compares the performances of different CFPs sets in reproducing the chi temp. dependence for the elpasolite Cs2NaDyCl6 complex
+
+    ## experimental data
+    x = np.array([6.229508196721311, 5.027322404371585, 4.918032786885246, 7.3224043715847, 8.633879781420765, 9.94535519125683, 11.256830601092895, 12.6775956284153, 16.174863387978142, 14.863387978142075, 19.12568306010929, 17.595628415300546, 20.87431693989071, 23.934426229508198, 27.10382513661202, 28.524590163934427, 30.163934426229506, 31.584699453551913, 33.333333333333336, 36.502732240437155, 39.34426229508197, 41.4207650273224, 44.37158469945355, 47.431693989071036, 50.60109289617486, 53.66120218579235, 56.612021857923494, 59.78142076502732, 62.51366120218579, 65.68306010928961, 68.85245901639344, 71.91256830601093, 75.08196721311475, 78.25136612021858, 81.31147540983606, 84.48087431693989, 86.775956284153, 2.841530054644809])
+    y = np.array([7.863436123348018, 7.995594713656388, 7.995594713656388, 8.524229074889869, 9.383259911894273, 9.581497797356828, 9.97797356828194, 10.440528634361234, 11.674008810572689, 11.806167400881058, 11.872246696035242, 12.114537444933921, 12.533039647577093, 12.753303964757709, 12.907488986784141, 13.01762114537445, 13.105726872246697, 13.171806167400883, 13.237885462555067, 13.392070484581499, 13.325991189427313, 13.502202643171806, 13.41409691629956, 13.392070484581499, 13.546255506607931, 13.502202643171806, 13.524229074889869, 13.612334801762115, 13.590308370044054, 13.656387665198238, 13.546255506607931, 13.546255506607931, 13.546255506607931, 13.502202643171806, 13.590308370044054, 13.612334801762115, 13.436123348017622, 6.299559471365639])    
+    
+    conf = 'f9'
+
+    calc = nja.calculation(conf, ground_only=True, TAB=True, wordy=False)
+
+    #calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
+    #calc.reduce_basis(conf, roots = [(21,6)], wordy=True)
+
+    ## AILFT
+    dic = {}
+    dic_V = {
+        '11':12140.0,
+        '21':0, '22':11971.4,
+        '31':0,'32':0,'33':11971.1,
+        '41':0,'42':0,'43':0,'44':11735.3,
+        '51':0,'52':0,'53':0,'54':0,'55':11870.1,
+        '61':0,'62':130.7,'63':0,'64':0,'65':0,'66':12038.3,
+        '71':0,'72':0,'73':-130.6,'74':0,'75':0,'76':0,'77':12038.9
+    }
+    dic_Bkq = nja.from_Vint_to_Bkq(dic_V, conf)
+    dic['dic_bkq'] = dic_Bkq
+    dic['F2'] = 109890.1
+    dic['zeta'] = 1737.8
+    result, projected = calc.MatrixH(['Hee','Hso','Hcf'], **dic, eig_opt=False, wordy=True, ground_proj=True, return_proj=True)
+    Magn = nja.Magnetics(calc, ['Hee','Hso','Hcf','Hz'], dic)
+    chi_nja = []
+    x1 = np.arange(1,90,4)
+    for T in x1:
+        print(str(T), end='\r')
+        chi= Magn.susceptibility_field(np.array([[0.0,0.0,1e-7]]), T, delta=0.01)[1]
+        chi_nja.append(chi[0])
+    chi_nja = np.array(chi_nja)
+
+    ## PCM dycl6^-3
+    data = nja.read_data('test/dycl63-.inp', sph_flag = False)
+    data[:,-1] *= -1
+    dic_Bkq = nja.calc_Bkq(data, conf)
+    dic['dic_bkq'] = dic_Bkq
+    result, projected = calc.MatrixH(['Hee','Hso','Hcf'], **dic, eig_opt=False, wordy=True, ground_proj=True, return_proj=True)
+    Magn = nja.Magnetics(calc, ['Hee','Hso','Hcf','Hz'], dic)
+    chi_nja2 = []
+    x1 = np.arange(1,90,4)
+    for T in x1:
+        print(str(T), end='\r')
+        chi= Magn.susceptibility_field(np.array([[0.0,0.0,1e-7]]), T, delta=0.01)[1]
+        chi_nja2.append(chi[0])
+    chi_nja2 = np.array(chi_nja2)
+
+    ## PCM cs2nadycl6
+    data = nja.read_data('test/cs2nadycl6.inp', sph_flag = False)
+    data[:,-1] *= -1
+    dic_Bkq = nja.calc_Bkq(data, conf)
+    dic['dic_bkq'] = dic_Bkq
+    result, projected = calc.MatrixH(['Hee','Hso','Hcf'], **dic, eig_opt=False, wordy=True, ground_proj=True, return_proj=True)
+    Magn = nja.Magnetics(calc, ['Hee','Hso','Hcf','Hz'], dic)
+    chi_nja4 = []
+    x1 = np.arange(1,90,4)
+    for T in x1:
+        print(str(T), end='\r')
+        chi= Magn.susceptibility_field(np.array([[0.0,0.0,1e-7]]), T, delta=0.01)[1]
+        chi_nja4.append(chi[0])
+    chi_nja4 = np.array(chi_nja4)
+
+    ## AILFT corrected for PCM cs2nadycl6 
+    data = nja.read_data('test/cs2nadycl6_empty.inp', sph_flag = False)
+    data[:,-1] *= -1
+    dic_Bkq = nja.calc_Bkq(data, conf)
+    dic_V2 = nja.from_Vint_to_Bkq_2(3, dic_Bkq, reverse=True)
+    dic_V3 = {key:dic_V2[key]+dic_V[key] for key in dic_V2.keys()}
+    dic_Bkq = nja.from_Vint_to_Bkq_2(3, dic_V3)
+    dic['dic_bkq'] = dic_Bkq
+    result, projected = calc.MatrixH(['Hee','Hso','Hcf'], **dic, eig_opt=False, wordy=True, ground_proj=True, return_proj=True)
+    Magn = nja.Magnetics(calc, ['Hee','Hso','Hcf','Hz'], dic)
+    chi_nja5 = []
+    x1 = np.arange(1,90,4)
+    for T in x1:
+        print(str(T), end='\r')
+        chi= Magn.susceptibility_field(np.array([[0.0,0.0,1e-7]]), T, delta=0.01)[1]
+        chi_nja5.append(chi[0])
+    chi_nja5 = np.array(chi_nja5)
+
+    ## AOM dycl6^-3
+    data = nja.read_data('test/dycl63-.inp', sph_flag = False)
+    data[:,-1] *= -1
+    dic_Bkq = nja.calc_Bkq(data, conf)
+    del dic['dic_bkq']
+    AOM = np.array([[300.5,138,138,0.0,0.0,0.0],
+                            [300.5,138,138,0.0,0.0,0.0],
+                            [300.5,138,138,0.0,0.0,0.0],
+                            [300.5,138,138,0.0,0.0,0.0],
+                            [300.5,138,138,0.0,0.0,0.0],
+                            [300.5,138,138,0.0,0.0,0.0]])
+    sph_coord = nja.from_car_to_sph(data[:,1:-1])
+    AOM[:,3:-1] = sph_coord[:,1:]*180/np.pi
+    dic_AOM = {}
+    for i in range(6):
+        dic_AOM['Cl'+str(i+1)] = AOM[i,:]
+    dic['dic_AOM'] = dic_AOM
+    dic['F2'] = 412.1*225
+    dic['F4'] = 60.9*1089
+    dic['F6'] = 6.3*184041/25
+    dic['zeta'] = 1920
+    pprint(dic)
+    calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
+    calc.reduce_basis(conf, roots = [(21,6),(13,4)], wordy=True)
+    result, projected = calc.MatrixH(['Hee','Hso','Hcf'], **dic, eig_opt=False, wordy=True, ground_proj=True, return_proj=True)
+    Magn = nja.Magnetics(calc, ['Hee','Hso','Hcf','Hz'], dic)
+    chi_nja3 = []
+    x1 = np.arange(1,90,4)
+    for T in x1:
+        print(str(T), end='\r')
+        chi= Magn.susceptibility_field(np.array([[0.0,0.0,1e-7]]), T, delta=0.01)[1]
+        chi_nja3.append(chi[0])
+    chi_nja3 = np.array(chi_nja3)
+
+    ## plot of the results
+    conv = 1/(np.pi*4/(1e6*scipy.constants.Avogadro*x1)) #cm^3 K/mol
+    plt.figure(figsize=(5, 4.5))
+    plt.plot(x,y,'o',c='b',label='Experiment')
+    plt.ylim(0,15)
+    plt.plot(x1,chi_nja*conv,'-.',c='r',label='NJA-CFS (AILFT)')
+    plt.plot(x1,chi_nja2*conv,'--',c='r',label=r'NJA-CFS (PCM [DyCl$_6$]$^{-3}$)')
+    plt.plot(x1,chi_nja4*conv,'--',c='g',label=r'NJA-CFS (PCM Cs$_2$NaDyCl$_6$)')
+    plt.plot(x1,chi_nja5*conv,'-.',c='g',label='NJA-CFS (AILFT corrected)')
+    plt.plot(x1,chi_nja3*conv,':',c='magenta',label='NJA-CFS (AOM)')
+    plt.xlabel('Temperature (K)')
+    plt.ylabel(r'$\chi$T (cm$^3$ K/mol)')
+    plt.legend()
+    #plt.show()
+    plt.savefig('dycl6_tempdep_PCM4_wAOM.png', dpi=600)
+    exit()
+
+def Susceptibility_Tdep():
+
+    tmax = 301
+
+    conf = 'f9'
+    contributes = ['Hcf']
+    calc = nja.calculation(conf, ground_only=True, TAB=True, wordy=False)
+    dic = nja.read_AILFT_orca6('test/run_DOTA1_21sextets.out', conf)
+    _,_ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    basis = np.loadtxt('matrix_label.txt')
+    LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
+    
+    filename = open('test/run_DOTA1_21sextets.out').readlines()
+    fmtsusc = nja.def_fmtsusc(filename)
+    chi_orca = []
+    for T in range(1,tmax,2):
+        print(str(T), end='\r')
+        chi_AILFT = nja.find_chi(fmtsusc, filename, T)
+        w,v = np.linalg.eig(chi_AILFT)
+        w,v = nja.princ_comp(w,v)
+        chi_orca.append(w)
+    chi_orca = np.array(chi_orca)
+    print(' ')
+    chi_nja = []
+    for T in range(1,tmax,2):
+        print(str(T), end='\r')
+        chi_B_diff, _ = nja.susceptibility_B_ord1(np.array([[0.0,0.0,0.0]]), T, basis, LF_matrix, delta=1)
+        w,v = np.linalg.eig(chi_B_diff)
+        w,v = nja.princ_comp(w,v)
+        chi_nja.append(w)
+    chi_nja = np.array(chi_nja)
+
+    Temp = np.arange(1,tmax,2)*1/(np.pi*4/(1e6*scipy.constants.Avogadro))
+
+    plt.figure(figsize=(8, 4.5))
+    plt.plot(np.arange(1,tmax,2), chi_orca[:,0]*Temp,'--',c='r', label=r'CASSCF, $\chi_x$')
+    plt.plot(np.arange(1,tmax,2), chi_nja[:,0]*Temp,c='r', label=r'NJA-CFS, $\chi_x$')
+    plt.plot(np.arange(1,tmax,2), chi_orca[:,1]*Temp,'--',c='g', label=r'CASSCF, $\chi_y$')
+    plt.plot(np.arange(1,tmax,2), chi_nja[:,1]*Temp,c='g', label=r'NJA-CFS, $\chi_y$')
+    plt.plot(np.arange(1,tmax,2), chi_orca[:,2]*Temp,'--',c='b', label=r'CASSCF, $\chi_z$')
+    plt.plot(np.arange(1,tmax,2), chi_nja[:,2]*Temp,c='b', label=r'NJA-CFS, $\chi_z$')
+    plt.xlabel('Temperature (K)')
+    plt.ylabel(r'$\chi$T (cm$^3$ K/mol)')
+    plt.legend()
+    plt.savefig('dydota_tempdep.png', dpi=600)
 
 if __name__ == '__main__':
 
@@ -1319,6 +1502,8 @@ if __name__ == '__main__':
 
     #### other examples
     # eigenfunction_optimization_opt()
+    # comparison_exp_chi()
+    # Susceptibility_Tdep()
 
     
     

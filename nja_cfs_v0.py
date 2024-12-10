@@ -1249,7 +1249,7 @@ class calculation():
             v = np.round(v, 16)  #numbers are saved as complex128 data type
             result = np.vstack((w,v))
             result = np.copy(result[:, result[0,:].argsort()])
-            print(result[0,:].real-np.min(result[0,:].real))
+            # print(result[0,:].real-np.min(result[0,:].real))
 
             # energy_print = np.around(result[0,:].real-np.min(result[0,:].real),8)
             # energy_list, energy_count = np.unique(energy_print, return_counts=True)
@@ -3234,8 +3234,8 @@ def from_Vint_to_Bkq(dic_V, conf):
                    '6':{'0':(1./7.)*np.sqrt(13*np.pi)*(2*dic_V['11'] - (3./2.)*(dic_V['22']+dic_V['33']) + (3./5.)*(dic_V['44']+dic_V['55']) - (1./10.)*(dic_V['66']+dic_V['77'])),
                         '1':np.sqrt((13./7.)*np.pi)*(-dic_V['31'] + (1./2.)*np.sqrt(3./5.)*(dic_V['42']+dic_V['53']) + (1./10.)*(-dic_V['64']-dic_V['75'])),
                         '-1':np.sqrt((13./7.)*np.pi)*(dic_V['21'] + (1./2.)*np.sqrt(3./5.)*(-dic_V['43']+dic_V['52']) + (1./10.)*(dic_V['65']-dic_V['74'])),
-                        '2':np.sqrt((13./7.)*np.pi)*(-(1./2.)*np.sqrt(3./5.)*(dic_V['22']-dic_V['33']) + (4/5)*dic_V['51'] - (1./5.)*(dic_V['62']+dic_V['73'])),
-                        '-2':np.sqrt((13./7.)*np.pi)*(-np.sqrt(3./5.)*dic_V['32'] - (4/5)*dic_V['41'] + (1./5.)*(dic_V['63']-dic_V['72'])),
+                        '2':np.sqrt((13./7.)*np.pi)*(-(1./2.)*np.sqrt(3./5.)*(dic_V['22']-dic_V['33']) + (4./5.)*dic_V['51'] - (1./5.)*(dic_V['62']+dic_V['73'])),
+                        '-2':np.sqrt((13./7.)*np.pi)*(-np.sqrt(3./5.)*dic_V['32'] - (4./5.)*dic_V['41'] + (1./5.)*(dic_V['63']-dic_V['72'])),
                         '3': (3./5.)*np.sqrt((39./14.)*np.pi)*(dic_V['42']-dic_V['53']) + (1./5.)*(np.sqrt((78./7.)*np.pi))*(-dic_V['71']),
                         '-3': (3./5.)*np.sqrt((39./14.)*np.pi)*(dic_V['43']+dic_V['52']) + (1./5.)*(np.sqrt((78./7.)*np.pi))*(dic_V['61']),
                         '4': (3./5.)*np.sqrt((26./7.)*np.pi)*(-dic_V['44']/2 + dic_V['55']/2) + np.sqrt((39./70.)*np.pi)*(-dic_V['62']+dic_V['73']),
@@ -3744,7 +3744,7 @@ def cfp_from_file(conf):
     if conf[0]=='d':
         file = open('tables/cfp_d_conf.txt', 'r').readlines()
     elif conf[0]=='f':
-        file = open('tables/cfp_f_conf.txt', 'r').readlines()
+        file = open('tables/cfp_f_conf.txt', 'r').readlines()[1:] #skip the first line
     else:
         raise ValueError('conf must be dn or fn')
     
@@ -4532,6 +4532,7 @@ def terms_basis(conf):
     return legenda[conf]
 
 def terms_labels_symm(conf):
+    #In this classification of states 99 and 999 substitute 00 and 000 respectively
 
     if conf[0]=='d' and int(conf[1:])>5:
         conf = 'd'+str(almost_closed_shells(conf))
@@ -5892,8 +5893,7 @@ def from_Vint_to_Bkq_2(l, dic_, reverse=False):
         B4_m4 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -np.sqrt(7.*np.pi/5.)*np.sqrt(2), 0]
 
         conv_matrix = np.vstack((B0_0, B2_0, B2_1, B2_m1, B2_2, B2_m2, B4_0, B4_1, B4_m1, B4_2, B4_m2, B4_3, B4_m3, B4_4, B4_m4))
-        # U, S, Vt = np.linalg.svd(conv_matrix)
-        # print(f'Conditioning number: {S[0]/S[-1]}')
+
 
     elif l==3:
 
@@ -5927,8 +5927,7 @@ def from_Vint_to_Bkq_2(l, dic_, reverse=False):
         B6_m6 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, (1./5.)*(np.sqrt((429./7.)*np.pi))*(-1), 0] 
 
         conv_matrix = np.vstack((B0_0, B2_0, B2_1, B2_m1, B2_2, B2_m2, B4_0, B4_1, B4_m1, B4_2, B4_m2, B4_3, B4_m3, B4_4, B4_m4, B6_0, B6_1, B6_m1, B6_2, B6_m2, B6_3, B6_m3, B6_4, B6_m4, B6_5, B6_m5, B6_6, B6_m6))
-        # U, S, Vt = np.linalg.svd(conv_matrix)
-        # print(f'Conditioning number: {S[0]/S[-1]}')
+
     
     if not reverse:
         B = np.dot(conv_matrix, V)
