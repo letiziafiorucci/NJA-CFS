@@ -834,7 +834,7 @@ class Hamiltonian():
         else:
             ck = Vee(label1v, label1v1)
         for i,_ in enumerate(range(0,2*self.l+1,2)):
-            if self.v==self.v1:
+            if label1v==label1v1:
                 integral += (ck[i] - ck_coeff[i])*coeff[i]
             else:
                 integral += ck[i]*coeff[i]
@@ -967,10 +967,8 @@ def Full_basis(conf):
 
     if conf[0]=='d':
         n_freeion_SL = [1,5,8,16,16]
-        TwoJp1 = [6,9,12,13,14]
     else:
         n_freeion_SL = [1,7,17,47,73,119,119]
-        TwoJp1 = [8,13,18,21,24,25,26]
 
     basis = []
     basis_l = []
@@ -1028,18 +1026,14 @@ def Full_basis(conf):
         if sen_str=='10':
             sen_str = '0'
         name_LS = str(TwoS+1)+state_legend(str(L), inv=True)+sen_str
-        #print(name_LS, term_base, count)
         J1 = np.abs(2*L-TwoS)
         J2 = 2*L + TwoS
-        #print(TwoS, L, J1, J2)
         for TwoJ in range(J1,J2+2,2):
-            #print('TwoJ', TwoJ)
             if TwoJ%2==0:
                 J_str = str(int(TwoJ/2))
             else:
                 J_str = str(int(TwoJ))+'/2'
             for TwoMJ in range(-TwoJ,TwoJ+2,2):
-                #print(TwoMJ)
                 if conf[0]=='f':
                     lista = [TwoS, L, TwoJ, TwoMJ, sen, count]
                 else:
@@ -1050,26 +1044,12 @@ def Full_basis(conf):
                     MJ_str = str(int(TwoMJ/2))
                 else:
                     MJ_str = str(int(TwoMJ))+'/2'
-                basis_l.append(str(TwoS+1)+state_legend(str(L), inv=True)+sen_str+' ('+J_str+')')  #questo forse ci potrei aggiungere MJ
+                basis_l.append(str(TwoS+1)+state_legend(str(L), inv=True)+sen_str+' ('+J_str+')')  
                 basis_l_JM.append(str(TwoS+1)+state_legend(str(L), inv=True)+sen_str+' ('+J_str+') '+MJ_str)
 
     basis = np.array(basis)
     basis_l = np.array(basis_l)
     basis_l_JM = np.array(basis_l_JM)
-
-    #ordering of basis (??)
-    #[2S, L, 2J, 2M, sen]
-    # if (conf[0]=='f' and n_el>7) or (conf[0]=='d' and n_el>5):
-    #     indices = np.lexsort((basis[:, 4], basis[:, 3], -basis[:, 2], -basis[:, 1], -basis[:, 0]))
-    # else:
-    #     indices = np.lexsort((basis[:, 4], basis[:, 3], basis[:, 2], -basis[:, 1], -basis[:, 0]))  #the last one is the first criteria
-    # basis = basis[indices]
-    # basis_l = basis_l[indices]
-    # basis_l_JM = basis_l_JM[indices]
-    # sorted_keys = [list(dic_LS.keys())[i] for i in indices]
-    # dic_LS_sorted = {k: dic_LS[k] for k in sorted_keys}
-
-    # exit()
 
     return basis, dic_LS, basis_l, basis_l_JM
 
@@ -1607,7 +1587,7 @@ class calculation():
             Li = statei[1]
             Ji = statei[2]/2.
             MJi = statei[3]/2.
-            seni = statei[-1]
+            seni = statei[4]
             labeli = dic_LS[':'.join([f'{qq}' for qq in statei])]
 
             if save_label:
@@ -1619,10 +1599,10 @@ class calculation():
                 Lj = statej[1]
                 Jj = statej[2]/2.
                 MJj = statej[3]/2.
-                senj = statej[-1]
+                senj = statej[4]
                 labelj = dic_LS[':'.join([f'{qq}' for qq in statej])]
                 
-                H = Hamiltonian([seni,Li,Si,senj,Lj,Sj,Ji,MJi,Jj,MJj], [labeli,labelj], self.conf, self.dic_cfp, self.tables, dic_LS, self.dic_LS_almost)  #self.conf è quella del main
+                H = Hamiltonian([seni,Li,Si,senj,Lj,Sj,Ji,MJi,Jj,MJj], [labeli,labelj], self.conf, self.dic_cfp, self.tables, dic_LS, self.dic_LS_almost)  
 
                 if 'Hee' in elem:
                     if Ji==Jj and MJi==MJj:

@@ -1769,7 +1769,7 @@ def test_PCM():  #with SIMPRE
     dic_Bqk = nja.calc_Bqk(data, conf, False, True)
 
     ### There's a sign mismatch between Bkq computed with SIMPRE and those from NJA
-    # using the Bkq from SIMPRE the susceptibility tensor orientation in Dybbpn complex is incorrect
+    ### using the Bkq from SIMPRE the susceptibility tensor orientation in Dybbpn complex is incorrect
     
     # Aqkrk_simpre = cfp_matrix[:,2]
     # Bqk_simpre = cfp_matrix[:,3]
@@ -1801,7 +1801,7 @@ def test_PCM():  #with SIMPRE
     sliced_keys = [eval(key[key.index(') ')+1:]) for key in keys_list]
     for i in range(1,matrix.shape[1]):
         if MJ_list[i-1] in sliced_keys:
-            for ii, key in enumerate(sliced_keys): #composition MJ and -MJ are swapped due to the sign mismatch
+            for ii, key in enumerate(sliced_keys): #in the composition MJ and -MJ are swapped due to the sign mismatch
                 if MJ_list[i-1] == key:
                     ind = ii
             #assert np.allclose(proj_nja[j+1][keys_list[ind]]/100, matrix[j,i], rtol=1e-3, atol=1e-3)
@@ -2522,6 +2522,51 @@ def test_reduction():
 
     assert result.shape[1]==126
 
+def eigenfunction_optimization_opt():
+
+    conf = 'f9'
+
+    data = nja.read_data('test/bbpn.inp', sph_flag = False)
+    data[:,-1] *= -1
+    dic_Bkq = nja.calc_Bkq(data, conf)
+    calc = nja.calculation(conf, ground_only=True, TAB=True, wordy=False)
+
+    # dic_Bkq_rot, _ = nja.calculation.opt_eigenfunction_minimization(calc, dic_Bkq, 16)
+    # dic_rot = {'dic_bkq': dic_Bkq_rot}
+
+    dic = {'dic_bkq': dic_Bkq}
+    result, _ = calc.MatrixH(['Hcf'], **dic, eig_opt=True, wordy=True, ground_proj=True, return_proj=True)
+    # Magn = nja.Magnetics(calc, ['Hcf','Hz'], dic_rot)
+    # chi_B_rot, _ = Magn.susceptibility_B_copy(fields=np.array([[0.0,0.0,0.0]]), temp=298., delta = 0.01)   
+
+    plt.figure(figsize=(5,5))
+    plt.imshow(np.abs(result[1:,:]), cmap='viridis', interpolation='none')
+    plt.colorbar(label='Value')
+    plt.xlabel('Column Index')
+    plt.ylabel('Row Index')
+    plt.xticks(ticks=np.arange(result.shape[1]), labels=np.arange(result.shape[1]))
+    plt.yticks(ticks=np.arange(result.shape[1]), labels=np.arange(result.shape[1]))
+    plt.savefig('f9_eigenfunction_opt_true.png', dpi=600)
+    plt.close()
+
+    dic = {'dic_bkq': dic_Bkq}
+    result, _ = calc.MatrixH(['Hcf'], **dic, eig_opt=False, wordy=True, ground_proj=True, return_proj=True)
+    # Magn = nja.Magnetics(calc, ['Hcf','Hz'], dic)
+    # chi_B, _ = Magn.susceptibility_B_copy(fields=np.array([[0.0,0.0,0.0]]), temp=298., delta = 0.01)
+
+    plt.figure(figsize=(5,5))
+    plt.imshow(np.abs(result[1:,:]), cmap='viridis', interpolation='none')
+    plt.colorbar(label='Value')
+    plt.xlabel('Column Index')
+    plt.ylabel('Row Index')
+    plt.xticks(ticks=np.arange(result.shape[1]), labels=np.arange(result.shape[1]))
+    plt.yticks(ticks=np.arange(result.shape[1]), labels=np.arange(result.shape[1]))
+    plt.savefig('f9_eigenfunction_opt_false.png', dpi=600)
+    plt.close()
+
+    #check with susceptibility and eigenfunction composition
+
+
 if __name__ == '__main__':
 
     #### test graphical representations
@@ -2557,6 +2602,9 @@ if __name__ == '__main__':
     test_calc_susceptibility_zerofield()  #d8
     test_torque()
     test_reduction()
+
+    #### other examples
+    # eigenfunction_optimization_opt()
 
     
     
