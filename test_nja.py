@@ -1234,8 +1234,8 @@ def test_reduction():
     contributes = ['Hee','Hso','Hcf']
     dic = nja.read_AILFT_orca6('test/run_DOTA1_21sextets.out', conf)
 
-    calc = nja.calculation(conf, ground_only=False, TAB=False)
-    calc.reduce_basis(conf, roots = [(21,6)])  
+    calc = nja.calculation(conf, ground_only=False, TAB=True)
+    calc.reduce_basis(conf, roots = [(21,6)], wordy=True)  
     result, _ = calc.MatrixH(contributes, **dic, ground_proj=True, return_proj=True)
 
     assert result.shape[1]==126

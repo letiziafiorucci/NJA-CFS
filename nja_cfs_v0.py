@@ -3779,111 +3779,48 @@ def cfp_from_file(conf):
 
     return cfp_dic
 
-def read_matrix_from_file(conf, closed_shell=False):
-    #legge le matrici Uk e V11 dai file di OctoYot
-    #le seniority sono come quelle di Nielson e Koster
+def read_matrix_from_file(conf_print, closed_shell=False):
 
-    prime = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61]
-
-    file = open('tables/'+conf[0]+'_electron_mod.dat').readlines()
-    check = False
+    file = open('tables/tables_'+conf_print[0]+'conf.txt').readlines()
+    
     dizionario = {}
+    conf = None
     for i,line in enumerate(file):
-        if 'MATRIX FOR' in line and 'ELECTROSTATIC' not in line:
-            line = line.replace('\n','')
-            nomi = line.split(' ')
-            if nomi[-1] in dizionario.keys():
-                dizionario[nomi[-1]][nomi[0][1:]] = {}
-            else:
-                dizionario[nomi[-1]] = {}
-                dizionario[nomi[-1]][nomi[0][1:]] = {}
-            check = True
-            continue
-            #print('1', nomi)
-        # print(dizionario)
-        if check == True and 'ELECTROSTATIC' not in line and 'ZZ' not in line and '\n' != line:
-            line = line.replace('\n','')
-            splitline=line.split(' ')
-            splitline = [elem for elem in splitline if elem != '']
-            #print('2',splitline)
-            numeri = []
-            stringhe = []
-            for j in range(len(splitline)):
-                try:
-                    numeri.append(int(splitline[j]))
-                except:
-                    stringhe.append(splitline[j])
-            # print(numeri)
-            valore = 1
-            for j in range(1,len(numeri)):
-                valore *= prime[j-1]**numeri[j]
-            valore = np.sqrt(valore)
-            try:
-                valore *= numeri[0]
-            except:
-                print(splitline)
-                exit()
-            # print(valore)
-            # exit()
-            if len(stringhe)>1:
-                # print('true')
-                n1 = list(dizionario.keys())[-1]
-                n2 = list(dizionario[n1].keys())[-1]
-                n3 = stringhe[0]
-                n4 = stringhe[1]
-                dizionario[n1][n2][n3] = {}
-            else:
-                n4 = stringhe[0]
+        if 'CONFIGURATION' in line:
+            line = line.strip()
+            conf = line.split()[-1]
+            dizionario[conf] = {}
+        elif 'MATRIX' in line:
+            line = line.strip()
+            key1 = line.split()[-1]
+            dizionario[conf][key1] = {}
+        elif '#' in line:
+            pass
+        else:
+            splitline = line.split()
+            if splitline[0] not in dizionario[conf][key1].keys():
+                dizionario[conf][key1][splitline[0]] = {}
+            dizionario[conf][key1][splitline[0]][splitline[1]] = float(splitline[-1])
 
-            dizionario[n1][n2][n3].update({n4:valore})
+            L = state_legend(splitline[0][1])
+            S = int(splitline[0][0])
+            L1 = state_legend(splitline[1][1])
+            S1 = int(splitline[1][0])
 
-        if 'MATRIX FOR' in line or 'ELECTROSTATIC' in line or 'ZZ' in line or '\n' == line:
-            #print('3',line)
-            check=False
+            if key1=='V11':
+                if splitline[1] not in dizionario[conf][key1].keys():
+                    dizionario[conf][key1][splitline[1]] = {}
+                dizionario[conf][key1][splitline[1]][splitline[0]] = float(splitline[-1])*(-1)**(L-L1-S/2+S1/2)
+            else:
+                if splitline[1] not in dizionario[conf][key1].keys():
+                    dizionario[conf][key1][splitline[1]] = {}
+                dizionario[conf][key1][splitline[1]][splitline[0]] = float(splitline[-1])*(-1)**(L-L1)
 
     if closed_shell==False:
-        conf_str = conf
+        conf_str = conf_print
     else:
-        conf_n = almost_closed_shells(conf)
+        conf_n = almost_closed_shells(conf_print)
         conf_str = conf[0]+str(conf_n)
-
-
-    aggiunta = {}
-    for key in dizionario[conf_str].keys():
-        kk = int(key[-1])
-        aggiunta[key] = {}
-        for key1 in dizionario[conf_str][key].keys():
-            L = state_legend(key1[1])
-            S = int(key1[0])
-            for key2 in dizionario[conf_str][key][key1].keys():
-                L1 = state_legend(key2[1])
-                S1 = int(key2[0])
-
-                if key=='V11':
-                    try:
-                        dizionario[conf_str][key][key2][key1] = dizionario[conf_str][key][key1][key2]*(-1)**(L-L1-S/2+S1/2)
-                    except:
-                        try:
-                            prova = aggiunta[key][key2]
-                        except:
-                            aggiunta[key][key2] = {}
-                        aggiunta[key][key2].update({key1:dizionario[conf_str][key][key1][key2]*(-1)**(L-L1-S/2+S1/2)})
-                else:
-                    try:
-                        dizionario[conf_str][key][key2][key1] = dizionario[conf_str][key][key1][key2]*(-1)**(L-L1)
-                    except:
-                        try:
-                            prova = aggiunta[key][key2]
-                        except:
-                            aggiunta[key][key2] = {}
-                        aggiunta[key][key2].update({key1:dizionario[conf_str][key][key1][key2]*(-1)**(L-L1)})
-
-
-    for key in aggiunta.keys():
-        dizionario[conf_str][key].update(aggiunta[key])
-
-    # pprint(dizionario[conf_str]['U6'])
-    # exit()
 
     return dizionario[conf_str]
 
