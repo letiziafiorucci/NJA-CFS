@@ -1299,7 +1299,7 @@ if __name__ == '__main__':
     test_conv_Vint_Bkq_d() #d8
     test_PCM() #f9
     test_PCM_2() #f10
-    test_StevensfromMOLCAS #f9
+    test_StevensfromMOLCAS() #f9
     test_Wigner_Euler_quat()
     test_Wigner_Euler_quat2()
     test_LF_rotation_euler()
