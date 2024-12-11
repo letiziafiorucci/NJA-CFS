@@ -1,6 +1,7 @@
 *
 !tables
 !test/simpre.out
+!test/example_simpre.inp
 !test
 !docs
 !nja_cfs_v0.py
