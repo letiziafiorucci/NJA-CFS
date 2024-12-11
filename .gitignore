@@ -1,9 +1,8 @@
 *
 !tables
-!tables/tables_dconf.txt
-!tables/tables_fconf.txt
-!test/*
-!docs/*
+!test/simpre.out
+!test
+!docs
 !nja_cfs_v0.py
 !nja_cfs_red.py
 !test_nja.py
