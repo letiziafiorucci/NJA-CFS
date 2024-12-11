@@ -1,5 +1,5 @@
 *
-!tables/*
+!tables
 !tables/tables_dconf.txt
 !tables/tables_fconf.txt
 !test/*
