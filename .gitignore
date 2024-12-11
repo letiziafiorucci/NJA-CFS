@@ -1,5 +1,7 @@
 *
 !tables/*
+!tables/tables_dconf.txt
+!tables/tables_fconf.txt
 !test/*
 !docs/*
 !nja_cfs_v0.py
