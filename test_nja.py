@@ -11,7 +11,6 @@ import numpy as np
 import scipy
 from pprint import pprint
 import matplotlib.pyplot as plt
-import sympy
 import copy
 import crystdat
 
