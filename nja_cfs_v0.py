@@ -12,7 +12,7 @@ from datetime import datetime
 from pprint import pprint
 import copy
 import warnings
-import sympy
+#import sympy   #activate this to use evaluation False in functions 
 import crystdat
 
 __version__ = "1.1.0"
@@ -60,6 +60,10 @@ def cron(func, *args, **kwargs):
     return new_func
 
 class Wigner_coeff():
+    """
+    This class is a wrapper around the functions to compute angular momentum coupling coefficients
+    and Wigner D matrices for spherical harmonics rotations.
+    """
 
     def fact(number):
         """
