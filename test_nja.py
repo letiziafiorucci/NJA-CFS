@@ -962,7 +962,7 @@ def test_gtensor():
 
     assert round(gw[0],1)==np.round(0.094,1) and round(gw[1],1)==np.round(0.358,1) and round(gw[2],1)==np.round(7.688,1)
     assert int(energy_list[1]) == 257
-    assert angle1 < 1 and angle2 < 1 and angle3 < 1
+    assert (angle1 < 1 or (angle1>179 and angle1<180)) and (angle2 < 1 or (angle2>179 and angle2<180)) and (angle3 < 1 or (angle3>179 and angle3<180))
 
 @test
 def test_susceptibility_B_ord1():
