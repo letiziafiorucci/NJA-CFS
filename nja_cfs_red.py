@@ -15,7 +15,7 @@ import warnings
 import sympy
 import crystdat
 
-__version__ = "0.2.4"
+__version__ = "1.2.0"
 
 def print_program_info():
     program_name = "NJA-CFS (Not Just Another - Crystal Field Software)"

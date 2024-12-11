@@ -15,7 +15,7 @@ import warnings
 import sympy
 import crystdat
 
-__version__ = "0.1.4"
+__version__ = "1.1.0"
 
 def print_program_info():
     program_name = "NJA-CFS (Not Just Another - Crystal Field Software)"
@@ -1606,7 +1606,7 @@ class calculation():
 
         return dic_rot, quat
 
-#======================= NEW FUNCTIONS for MAGNETIC PROPERTIES ==============================
+#======================= DETACHED FUNCTIONS for MAGNETIC PROPERTIES ==============================
 
 def fact(number):
     number = int(number)
@@ -5201,8 +5201,6 @@ def color_atoms():
     
     return elem_cpk
 
-#OLD FUNCTIONS
-
 def read_structure(filexyz):
     #first 2 lines are not accounted for
     label = []
@@ -5789,6 +5787,7 @@ def read_xyz(filename):
     return filecoord
 
 def from_Vint_to_Bkq_2(l, dic_, reverse=False):
+    #equivalent to from_Vint_to_Bkq but with the possibility of doing the reverse operation
 
     dic_conv = copy.deepcopy(dic_)
 
