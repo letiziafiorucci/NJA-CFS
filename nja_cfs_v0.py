@@ -2792,7 +2792,7 @@ def fig_susc_field(conf, dic_Bkq, temp=2., n_points=20, delta=0.01):
     magnitudes = use_nja_(conf, dic_Bkq, points)
 
     #subtract the average
-    magnitudes -= np.average(magnitudes)
+    #magnitudes -= np.average(magnitudes)
 
     x_scaled = (x.ravel() * magnitudes).reshape(x.shape)
     y_scaled = (y.ravel() * magnitudes).reshape(y.shape)
