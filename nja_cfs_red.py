@@ -263,46 +263,6 @@ class Wigner_coeff():
         d *= somma
         return np.exp(-1j*m1*alpha)*d*np.exp(-1j*m*gamma)
 
-    def Wigner_Dmatrix_quat(l, m1, m, R, e=1e-8):
-        #R = R1 1 + Rx x + Ry y + Rz z
-        #wigner D matrix D^l_m1m(R) scritta con i quaternioni (presa da How should spin-weighted spherical functions be defined? di Michael Boyle eq 35)
-        #Ra e Rs si riferiscono alle geometric projections of the quaternion R into “symmetric” and “antisymmetric” components
-        Rs = R[0]+1j*R[-1]
-        Ra = R[2]+1j*R[1]
-        rs = abs(Rs)
-        ra = abs(Ra)
-        phis = cmath.phase(Rs)
-        phia = cmath.phase(Ra)
-
-        if abs(ra)<e:# and abs(rs)>e:
-            if m1==m:
-                return np.exp(1j*2*m*phis)
-            else:
-                return 0
-        elif abs(rs)<e:# and abs(ra)>e:
-            if -m1==m:
-                return (-1)**(l+m)*np.exp(1j*2*m*phia)
-            else:
-                return 0
-        elif abs(ra)>e and abs(rs)>e and ra<=rs:
-            rho1 = max(0,m1-m)
-            rho2 = min(l+m1,l-m)
-            fattore = np.sqrt(fact(l+m)*fact(l-m)/(fact(l+m1)*fact(l-m1)))*rs**(2*l-m+m1-2*rho1)*ra**(m-m1+2*rho1)*np.exp(1j*(phis*(m+m1)+phia*(m-m1)))
-            somma = 0
-            for rho in range(rho1,rho2+1):
-                somma += scipy.special.binom(l+m1,rho)*scipy.special.binom(l-m1,l-m-rho)*(-(ra**2/rs**2))**rho
-            return fattore*somma
-        elif abs(ra)>e and abs(rs)>e and rs<ra:
-            rho3 = max(0,-m1-m)
-            rho4 = min(l-m1,l-m)
-            fattore = np.sqrt(fact(l+m)*fact(l-m)/(fact(l+m1)*fact(l-m1)))*ra**(2*l-m-m1-2*rho3)*rs**(m+m1+2*rho3)*(-1)**(l+m)*np.exp(1j*(phia*(m-m1)+phis*(m+m1)))
-            somma = 0
-            for rho in range(rho3,rho4+1):
-                somma += scipy.special.binom(l+m1,l-m-rho)*scipy.special.binom(l-m1,rho)*(-(rs**2/ra**2))**rho
-            return fattore*somma
-        # else:
-        #     return 0
-
     def Wigner_Dmatrix_quat_complete(l, R, bin=1e-8, dict = None, coeff=None):
         #R = R1 1 + Rx x + Ry y + Rz z
         #equations from reorientational correlation functions, quaternions and wigner rotation matrices
@@ -442,19 +402,6 @@ class Wigner_coeff():
 
 
 class CFP():
-    """
-    A class to represent a configuration interaction (CI) calculation for a given electron configuration.
-
-    This class is used to perform a CI calculation for a given electron configuration. The electron configuration is represented by a string of the form 'nl^x', where 'n' is the principal quantum number, 'l' is the azimuthal quantum number (represented as 'd' for l=2 and 'f' for l=3), and 'x' is the number of electrons in the configuration.
-
-    Attributes:
-    l (int): orbital momentum quantum number.
-    n (int): The number of electrons in the almost-closed-shell configuration.
-    N (int): The total number of electrons in the configuration.
-    dic_cfp (dict): A dictionary containing the coefficients of fractional parentage (CFP) for the configuration.
-    closed (bool): A flag indicating whether the configuration is almost-closed-shell or not.
-    dic_LS_inv_almost (dict, optional): An inverse dictionary for the LS-coupling scheme for the almost-closed-shell configuration.
-    """
 
     def __init__(self, conf, dic_cfp, dic_LS_inv_almost=None):
         #conf è del tipo l^(numero di elettroni)
@@ -497,23 +444,21 @@ class CFP():
 
 
     def cfp(self, v, L, S, name):
-        #ritorna i cfp sulla base del termine selezionato
-        #dic è un dizionario di dizionari
+        #returns the cfp for the given state
 
-        dic = self.dic_cfp  #qui per i closed shell ci deve andare quella del complementare+1
+        dic = self.dic_cfp 
 
         # name = str(int(2*S+1))+state_legend(str(L), inv=True)+str(v)
-        if self.closed==True:  #se si questo è vero allora i cfp li devo cercare al contrario
+        if self.closed==True:  
             cfp_list = []
             for keys in dic.keys():
                 values_list = [[key, float(val)] for key, val in dic[keys].items()]
                 values = sum(values_list, [])
                 for i in range(0,len(values),2):
                     if values[i]==name:
-                        term = self.dic_LS_inv_almost[keys][0] #mi basta prendere il primo perchè sono interessata solo a L,S,v
+                        term = self.dic_LS_inv_almost[keys][0] 
                         Sk = term[0]/2.
                         Lk = term[1]
-                        vk = term[-1]
                         N = self.N-1
                         cfp_value = values[i+1]/((-1)**(Sk+S+Lk+L-self.l-0.5)*np.sqrt((N+1)*(2*S+1)*(2*L+1)/((4*self.l+2-N)*(2*Sk+1)*(2*Lk+1))))  #non vale per self.N = 2*self.l
                         cfp_list.append([keys,cfp_value])
@@ -2327,19 +2272,7 @@ class Magnetics():
             print('M '+str(M_list[i])+'\n' if wordy else "", end = "")
             print('chi '+str(susc_list[i])+'\n' if wordy else "", end = "")
 
-        idxM = np.argmax(M_list)
-        idxm = np.argmin(M_list)
-
-        M_av = np.sum(M_list)/len(M_list)
-        sopra, sotto = 0,0
-        for i in range(len(M_list)):
-            if M_list[i]>M_av:
-                sopra += 1
-            else:
-                sotto += 1
-
-
-        return M_list, susc_list, fields[idxM], fields[idxm], idxM, idxm, (sopra, sotto)
+        return M_list, susc_list
     
 
     def susceptibility_B_copy(self, fields, temp, delta=0.001, wordy=False):
@@ -2706,7 +2639,6 @@ def fig_tensor_rep_1(tensor, n_points=40):
     points = np.stack((x.ravel(), y.ravel(), z.ravel()), axis=1)  # Shape: (N, 3)
     points = points / np.linalg.norm(points, axis=1)[:, np.newaxis]
 
-    # Initialize result array
     N = points.shape[0]
     magnitudes = np.zeros(N)
 
@@ -2722,11 +2654,9 @@ def fig_tensor_rep_1(tensor, n_points=40):
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111, projection='3d')
 
-    # Normalize magnitudes for coloring
     norm = plt.Normalize(magnitudes.min(), magnitudes.max())
     colors = plt.cm.turbo(norm(magnitudes).reshape(x.shape))
 
-    # Plot the surface with facecolors based on magnitudes
     ax.plot_surface(x_scaled, y_scaled, z_scaled, facecolors=colors, edgecolor='k', alpha=1, linewidth=0.5)
 
     # Set transparent background
@@ -2740,21 +2670,17 @@ def fig_tensor_rep_1(tensor, n_points=40):
     ax.set_ylabel('y')
     ax.set_zlabel('z')
 
-    # Calculate the limits for each axis
     x_limits = [x_scaled.min(), x_scaled.max()]
     y_limits = [y_scaled.min(), y_scaled.max()]
     z_limits = [z_scaled.min(), z_scaled.max()]
 
-    # Determine the widest range
     all_limits = np.array([x_limits, y_limits, z_limits])
     widest_range = all_limits.max() - all_limits.min()
 
-    # Set all axes to the same range
     ax.set_xlim(all_limits.min(), all_limits.min() + widest_range)
     ax.set_ylim(all_limits.min(), all_limits.min() + widest_range)
     ax.set_zlim(all_limits.min(), all_limits.min() + widest_range)
 
-    # Add a colorbar
     mappable = plt.cm.ScalarMappable(cmap='turbo', norm=norm)
     mappable.set_array(magnitudes)
     plt.colorbar(mappable, ax=ax, shrink=0.5, aspect=8)
@@ -2812,7 +2738,7 @@ def fig_susc_field(conf, dic_Bkq, temp=2., n_points=20, delta=0.01):
         dic['dic_bkq'] = dic_Bkq
 
         Magn = Magnetics(calc, ['Hcf','Hz'], dic)
-        _, susc_field, *_ = Magn.susceptibility_field(fields=field_vecs, temp=temp, delta = delta, wordy=wordy)
+        _, susc_field = Magn.susceptibility_field(fields=field_vecs, temp=temp, delta = delta, wordy=wordy)
 
         return susc_field
 
@@ -2826,7 +2752,7 @@ def fig_susc_field(conf, dic_Bkq, temp=2., n_points=20, delta=0.01):
 
     points = points / np.linalg.norm(points, axis=1)[:, np.newaxis]
 
-    magnitudes = use_nja_(conf, dic_Bkq, points, wordy=True)
+    magnitudes = use_nja_(conf, dic_Bkq, points)
 
     #subtract the average
     #magnitudes -= np.average(magnitudes)
@@ -2892,10 +2818,10 @@ def fig_rep_magnfield(Mvec, xyz, data=None):
         for i in range(data.shape[0]):
             vector = data[i,1:-1]
             ax.plot([0.,vector[0]],[0.,vector[1]],[0.,vector[2]],'--',lw=0.2,c='k')
-            if data[i,0] in nja.color_atoms().keys():
-                ax.scatter(vector[0],vector[1],vector[2],'o',c = nja.color_atoms()[data[i,0]],lw=3)
+            if data[i,0] in color_atoms().keys():
+                ax.scatter(vector[0],vector[1],vector[2],'o',c = color_atoms()[data[i,0]],lw=3)
             else:
-                ax.scatter(vector[0],vector[1],vector[2],'o',c = nja.color_atoms()['_'],lw=3)
+                ax.scatter(vector[0],vector[1],vector[2],'o',c = color_atoms()['_'],lw=3)
             ax.text(vector[0]+0.4*np.sign(vector[0]),vector[1]+0.4*np.sign(vector[1]),vector[2]+0.4*np.sign(vector[2]),data[i,-1], size=8)
 
     ax.set_xlim(-4, 4)
