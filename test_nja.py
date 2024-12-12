@@ -1,8 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-@author: letizia  (8/11/2023)
-"""
+
+# Before proceeding with the tests execution be sure to download the following dependencies (besides Python):
+# - numpy
+# - matplotlib
+# - scipy
+# 
+# Additional (optional) dependencies include:
+# - numba
+# - sympy
+# 
+# If you installed everything in a conda environment, the code can be run, from the NJA-CFS_main directory as:
+# >>> python test_nja.py
+# 
+# If you would like to use the NJA-CFS version that uses numba functionalities to speed up 
+# some parts of the code you can import nja_cfs_red in place of nja_cfs_v0 
+
+
+###### IMPORT SECTION ######
 
 import nja_cfs_v0 as nja
 import functools
@@ -13,6 +28,8 @@ from pprint import pprint
 import matplotlib.pyplot as plt
 import copy
 import crystdat
+
+############################
 
 ##############
 class color_term:
@@ -77,12 +94,15 @@ def cron(func, *args, **kwargs):
 
 @test
 def test_CF_splitting():
+    """
+    This test computes the projection of the CF splitting produced by a PCM
+    on real d orbitals (canonical orbitals) and produces the plot
+    """
 
     # Example usage to add multiple crystal field splittings
     fig, ax = plt.subplots()
 
     conf = 'd3'
-    contributes = ['Hee', 'Hcf', 'Hso']
 
     data = nja.read_data('test/Td_cube.inp', sph_flag = False)
     data[:,-1] *= -1
@@ -120,6 +140,12 @@ def test_CF_splitting():
 
 @test
 def test_plot_Ediagram():
+    """
+    This function computes energy levels and projections considering different contributions to the Hamiltonian
+    matrix, in order to produce the plot of the splitting of energy levels for the 3d^8 complex NISAL-HDPT.
+    The CFPs and the other parameters, i.e. F^k for interelectronic repulsion and zeta for SOC, are read from AILFT 
+    computed with ORCA software.  
+    """
 
     conf = 'd8'
     calc = nja.calculation(conf, TAB=False, wordy=False)
@@ -154,13 +180,18 @@ def test_plot_Ediagram():
 
         prev = result.copy()
 
-    E_matrix = np.array(E_matrix)  # dim = (n. contributi x n. livelli)
+    E_matrix = np.array(E_matrix)  
 
     #plot energy levels
     nja.level_fig_tot(E_matrix, theories, proj_LS_dict, proj_prev_dict)
 
 @test
 def test_plot_Ediagram_PCM():
+    """
+    This function computes energy levels and projections considering different contributions to the Hamiltonian
+    matrix, in order to produce the plot of the splitting of energy levels for a 4f^{12} complex.
+    The CFPs are computed from a PCM, while F^k and zeta are read from tables.
+    """
 
     conf = 'f12'
     calc = nja.calculation(conf, TAB=False, wordy=False)
@@ -199,21 +230,17 @@ def test_plot_Ediagram_PCM():
 
         prev = result.copy()
 
-    E_matrix = np.array(E_matrix)  # dim = (n. contributi x n. livelli)
+    E_matrix = np.array(E_matrix)  
 
     #plot energy levels
     nja.level_fig_tot(E_matrix, theories, proj_LS_dict, proj_prev_dict)
 
 @test
 def test_TanabeSugano():
-
-    def red_proj_LS(proj_LS):
-        state_order = []
-        for num in proj_LS.keys():
-            values = list(proj_LS[num].values())
-            state_n = np.argmax(values)
-            state_order.append(list(proj_LS[num].keys())[state_n])
-        return state_order
+    """
+    This function computes energy levels for a 3d^8 complex in D4h symmetry and plots them as function of CF energy,
+    hence producing the corresponding Tanabe-Sugano diagram.
+    """
 
     conf = 'd8'
     B = 1030
@@ -225,8 +252,7 @@ def test_TanabeSugano():
 
     #first point at 0 CF
     dic = nja.free_ion_param_AB(conf)
-    result = calc.MatrixH(['Hee', 'Hso'], **dic, eig_opt=False, wordy=False)
-    proj_LS = nja.projection_basis(result[1:,:], calc.basis_l)
+    result = calc.MatrixH(['Hee'], **dic, eig_opt=False, wordy=False)
 
     diagram = [(result[0,:]-np.min(result[0,:]))/B]
     x_axis = [0.0]
@@ -244,27 +270,14 @@ def test_TanabeSugano():
                 if ii>=j:
                     matrix[ii,j] = dic_V[str(ii+1)+str(j+1)]
                     matrix[j,ii] = dic_V[str(ii+1)+str(j+1)]
-        w,v = np.linalg.eigh(matrix)
-        # proj_LS = nja.projection_basis(result[1:,:], calc.basis_l)
-        # names = red_proj_LS(proj_LS)
-        # names_list.append(names)
+        w,_ = np.linalg.eigh(matrix)
         x_axis.append(-(w[0]-w[-1])/B)
         print(f'{i}    {x_axis[-1]/10}       ',end='\r')
         dic['dic_bkq'] = dic_Bkq
-        result = calc.MatrixH(['Hee','Hcf', 'Hso'], **dic, eig_opt=False, wordy=False)
+        result = calc.MatrixH(['Hee','Hcf'], **dic, eig_opt=False, wordy=False)
         diagram.append((result[0,:]-np.min(result[0,:]))/B)
 
     diagram = np.array(diagram)
-    # names = np.array(names_list)
-    # terms = nja.terms_labels(conf)
-    # colormap = plt.cm.get_cmap('tab10', 10)  # You can choose any colormap
-    # colors = [colormap(i) for i in range(10)]
-    # fig, ax = plt.subplots()
-    # for i in range(diagram.shape[1]):
-    #     for j in range(diagram.shape[0]):
-    #         ax.scatter(np.array(x_axis[j])/10, diagram[j,i], color=colors[terms.index(names[j,i])], lw=0.5)
-    # plt.show()
-
     fig, ax = plt.subplots()
     for i in range(diagram.shape[1]):
         ax.plot(np.array(x_axis)/10, diagram[:,i].real, 'k', lw=0.5)
@@ -274,6 +287,10 @@ def test_TanabeSugano():
 
 @test
 def test_plot_magnetization_field():
+    """
+    This function produces the plots of PAS of the susceptibility tensor and the scalar magnetization surface 
+    for the Dybbpn PCM model. 
+    """
 
     def use_nja_(conf, data, field_vecs, wordy=False):
 
@@ -378,7 +395,7 @@ def test_plot_magnetization_field():
     vec_field = np.array([0,0,1])
 
     data = nja.read_data('test/bbpn.inp', sph_flag = False)
-    # coord = data[:,1:-1]
+    data[:,-1] *= -1
 
     rep2000_cryst = np.array(crystdat.rep168_cryst)
 
@@ -401,6 +418,9 @@ def test_plot_magnetization_field():
 
 @test
 def test_torque():
+    """
+    Reproduce the plot of magnetic torque of 4f8 complex of referenced papers
+    """
     # Aqkrk from https://pubs.acs.org/doi/10.1021/jp0209244 table 3
     # equation for torque computation from https://www.sciencedirect.com/science/article/pii/S0010854517302515?via%3Dihub 
 
@@ -428,6 +448,11 @@ def test_torque():
        
 @test
 def test_PCM():  #with SIMPRE
+    """
+    Comparison of the CFPs computed from a PCM in NJA-CFS and SIMPRE.
+    There's a sign mismatch that does not affect the energy levels but it affects the sign of wavefunctions composition and 
+    the tensorial properties. 
+    """
 
     def read_out(J, directory=None):
 
@@ -486,7 +511,7 @@ def test_PCM():  #with SIMPRE
     dic_Bqk = nja.calc_Bqk(data, conf, False, True)
 
     ### There's a sign mismatch between Bkq computed with SIMPRE and those from NJA
-    ### using the Bkq from SIMPRE the susceptibility tensor orientation in Dybbpn complex is incorrect
+    ### using the Bkq from SIMPRE the susceptibility tensor orientations are incorrect
     
     # Aqkrk_simpre = cfp_matrix[:,2]
     # Bqk_simpre = cfp_matrix[:,3]
@@ -525,7 +550,9 @@ def test_PCM():  #with SIMPRE
 
 @test
 def test_PCM_2():  
-    #from simpre2, table 2
+    """
+    Comparison of the CFPs computed from a PCM in NJA-CFS and those presented in Table 2 in the paper:  https://doi.org/10.1002/jcc.23700. 
+    """
 
     data = nja.read_data('test/example_simpre.inp', sph_flag = True)
     data[:,-1] *= -1
@@ -552,7 +579,9 @@ def test_PCM_2():
             
 @test
 def test_conv_AqkrkBkq():
-    #conversion test from Bkq(Wyb) in PCM and Aqkrk(Stev) in PCM
+    """
+    Conversion test from Bkq(Wyb) in PCM and Aqkrk(Stev) in PCM
+    """
 
     conf = 'f11'
     data = nja.read_data('test/beta.inp', sph_flag = False)
@@ -567,6 +596,9 @@ def test_conv_AqkrkBkq():
 
 @test
 def test_StevensfromMOLCAS():
+    """
+    Comparison of wavefunction composition for a ground-only calculation of 4f^9 with CFPs from literature. 
+    """
 
     conf = 'f9'
     contributes = ['Hcf']
@@ -595,6 +627,9 @@ def test_StevensfromMOLCAS():
 
 @test
 def test_conv_Vint_Bkq_d():
+    """
+    Test for conversion among different CF parametrization schemes for the 3d^8 NiSAL-HDPT complex.
+    """
 
     conf = 'd8'
     contributes = ['Hee', 'Hcf', 'Hso']
@@ -642,34 +677,21 @@ def test_conv_Vint_Bkq_d():
     
 @test
 def test_conv_Vint_Bkq_f():
+    """
+    Test for conversion among different CF parametrization schemes for the 4f^{13} YbDOTA complex.
+    """
 
     conf = 'f13'
     contributes = ['Hee', 'Hcf', 'Hso']
 
     dic = nja.read_AILFT_orca6('test/run_YbDOTA.out', conf)
-    # pprint(dic['dic_bkq'])
-    # dic2 = dic.copy()
 
     calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
     result1, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
     
     dic_V1 = nja.from_Vint_to_Bkq_2(3, dic['dic_bkq'], reverse=True)
-    # pprint(dic_V1)
     dic_Bkq = nja.from_Vint_to_Bkq_2(3, nja.read_AILFT_orca6('test/run_YbDOTA.out', conf, return_V=True))
-    # pprint(dic_Bkq)
-    # exit()
-    #dic_Bkq['0']['0'] = 0
     dic['dic_bkq'] = dic_Bkq
-
-    # for k in range(0,7,2):
-    #     for q in range(-k, k+1, 1):
-    #         if k in dic2.keys() and q in dic2[str(int(k))].keys():
-    #             assert dic_Bkq[str(int(k))][str(int(q))]==dic2[str(int(k))][str(int(q))]
-    # assert dic['zeta']==dic2['zeta']
-    # assert dic['F2']==dic2['F2']
-    # assert dic['F4']==dic2['F4']
-    # assert dic['F6']==dic2['F6']
-    #pprint(dic)
     
     calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
     result2, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
@@ -677,7 +699,6 @@ def test_conv_Vint_Bkq_f():
     assert np.allclose(result1.real, result2.real, rtol=2, atol=1e-3)
     assert np.allclose(result1.imag, result2.imag, rtol=2, atol=1e-3)
 
-    # remove dic_bkq from dic
     del dic['dic_bkq']
     dic['dic_V'] = dic_V1
 
@@ -689,6 +710,9 @@ def test_conv_Vint_Bkq_f():
 
 @test
 def test_Wigner_Euler_quat():
+    """
+    Test for Wigner D matrix elements in Euler angles.
+    """
 
     A = 5.23375087
     B = 0.68208491
@@ -715,6 +739,9 @@ def test_Wigner_Euler_quat():
 
 @test
 def test_Wigner_Euler_quat2():
+    """
+    Test for Wigner D matrix elements in quaternions.
+    """
 
     A = 5.23375087
     B = 0.68208491
@@ -741,9 +768,11 @@ def test_Wigner_Euler_quat2():
 
 @test
 def test_LF_rotation_euler():
+    """
+    Rotation of CFPs from rotation matrix using Euler angles.
+    """
 
     conf = 'f9'
-    contributes = ['Hee', 'Hcf', 'Hso']
     ground = nja.ground_term_legend(conf)
     splitg = ground.split('(')
     J = eval(splitg[-1][:-1])
@@ -785,6 +814,9 @@ def test_LF_rotation_euler():
 
 @test
 def test_LF_rotation_quat():
+    """
+    Rotation of CFPs from rotation matrix using quaternions.
+    """
 
     conf = 'f9'
     
@@ -827,6 +859,9 @@ def test_LF_rotation_quat():
 
 @test
 def test_mag_moment():
+    """
+    magnetic moments computation for a 3d1 configuration.
+    """
 
     conf = 'd1'
     dic = {}
@@ -841,6 +876,9 @@ def test_mag_moment():
 
 @test
 def test_mag_moment2():
+    """
+    magnetic moments computation for a 4f9 configuration.
+    """
 
     basis = np.loadtxt('test/matrix_label_f9complete.txt')
     mu_matrix = nja.mag_moment(basis)
@@ -851,6 +889,8 @@ def test_mag_moment2():
 
 @test
 def test_M_vector():
+    """
+    """
 
     conf = 'd3'
     contributes = ['Hee', 'Hcf', 'Hso']
@@ -1117,56 +1157,6 @@ def test_susceptibility_B_ord1_3():
     assert chi_B_diff[0,0] > 1e-33
     assert err_B[0,0] < chi_B_diff[0,0]*1e-3
 
-@test
-def test_susceptibility_B_ord1_4():
-
-    conf = 'f2'
-    contributes = ['Hcf']
-    
-    #comparison with the results from: J. Am. Chem. Soc. 2021, 143, 8108−8115
-    cfp_list = np.loadtxt('test/CFP_PrDOTA.txt')
-    dic_Aqkrk = {}
-    count = 0
-    for k in range(2,7,2):
-        dic_Aqkrk[f'{k}'] = {}
-        for q in range(k,-k-1,-1):
-            dic_Aqkrk[f'{k}'][f'{q}'] = cfp_list[count]/nja.Stev_coeff(str(k), conf)
-            count += 1
-
-    dic_Bkq = nja.from_Aqkrk_to_Bkq(dic_Aqkrk)
-    dic = {}
-    dic['dic_bkq'] = dic_Bkq
-    dic_Bkq['0'] = {}
-    dic_Bkq['0']['0'] = 0
-
-    # chi ref syst for Pr from J. Am. Chem. Soc. 2021, 143, 8108−8115
-    Rot_mat = np.array([[-0.671039,-0.017267,-0.741221],[-0.027448,-0.998465,0.048109],[-0.740914,0.052628,0.669535]])  
- 
-    R = scipy.spatial.transform.Rotation.from_matrix(Rot_mat.T).as_quat()
-    quat = [R[-1], R[0], R[1], R[2]]
-    dict, coeff = nja.read_DWigner_quat()
-    dic_Bkq = nja.rota_LF_quat(3, dic_Bkq, quat, dict=dict, coeff=coeff)
-    dic['dic_bkq'] = dic_Bkq
-    dic_Bkq['0'] = {}
-    dic_Bkq['0']['0'] = 0
-
-    calc = nja.calculation(conf, ground_only=True, TAB=False, wordy=False)
-    _, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
-    basis = np.loadtxt('matrix_label.txt')
-    LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
-    
-    chi_B_diff, err_B = nja.susceptibility_B_ord1(np.array([[0.0,0.0,0.0]]), 2., basis, LF_matrix, delta=1)
-
-    w,v = np.linalg.eig(chi_B_diff)
-
-    nja.fig_tensor_rep_1(chi_B_diff)
-    #nja.fig_susc_field(conf, dic_Bkq)
-
-    w,v = nja.princ_comp(w,v)
-
-    print(v)
-
-    print(w/(np.pi*4/(1e6*scipy.constants.Avogadro)))
 
 # in weak-field / high-temperature limit, finite-field magnetization should be linear in external field
 @test
@@ -1237,7 +1227,67 @@ def test_reduction():
     calc.reduce_basis(conf, roots = [(21,6)], wordy=True)  
     result, _ = calc.MatrixH(contributes, **dic, ground_proj=True, return_proj=True)
 
+    file = open('test/run_DOTA1_21sextets.out').readlines()
+    abinitio = []
+    idx = None
+    for i,line in enumerate(file):
+        if idx is not None:
+            splitline = line.split()
+            abinitio.append(float(splitline[1]))
+        if "Eigenvalues:" in line:
+            idx = i
+        if len(abinitio)==126:
+            break
+
+    sum = 0
+    for i in range(result.shape[1]):
+        value = (result[0,i]-np.min(result[0,:])).real
+        sum += (abinitio[i]-value)**2
+    rms = np.sqrt(sum/126)
+    
+    assert rms < 10  # cm^{-1}
     assert result.shape[1]==126
+
+@test
+def test_reduction_2():
+
+    conf = 'f9'
+    contributes = ['Hee','Hso','Hcf']
+    dic = nja.read_AILFT_orca6('test/run_Dybbpn_susc.out', conf)
+
+    calc = nja.calculation(conf, ground_only=False, TAB=True)
+    calc.reduce_basis(conf, roots = [(21,6)], wordy=True)  
+    result, _ = calc.MatrixH(contributes, **dic, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+
+    file = open('test/run_Dybbpn_susc.out').readlines()
+    abinitio = []
+    idx = None
+    for i,line in enumerate(file):
+        if idx is not None:
+            splitline = line.split()
+            abinitio.append(float(splitline[1]))
+        if "Eigenvalues:" in line:
+            idx = i
+        if len(abinitio)==126:
+            break
+
+    sum = 0
+    for i in range(result.shape[1]):
+        value = (result[0,i]-np.min(result[0,:])).real
+        sum += (abinitio[i]-value)**2
+    rms = np.sqrt(sum/126)
+    
+    assert rms < 20  # cm^{-1}
+    assert result.shape[1]==126
+
+    fmtsusc = nja.def_fmtsusc(file)
+    chi = nja.find_chi(fmtsusc, file, 298.0)
+
+    basis = np.loadtxt('matrix_label.txt')
+    LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
+    chi_B_diff, err_B = nja.susceptibility_B_ord1(np.array([[0.0,0.0,0.0]]), 298., basis, LF_matrix, delta=1)
+
+    assert np.allclose(chi, chi_B_diff, atol=1e-37, rtol=2)
 
 def eigenfunction_optimization_opt():
 
@@ -1494,10 +1544,10 @@ if __name__ == '__main__':
     test_susceptibility_B_ord1()  #d8
     test_susceptibility_B_ord1_2()  #d8
     test_susceptibility_B_ord1_3()  #f9
-    test_susceptibility_B_ord1_4()  #f2
     test_calc_susceptibility_zerofield()  #d8
     test_torque()
     test_reduction()
+    test_reduction_2()
 
     #### other examples
     # eigenfunction_optimization_opt()

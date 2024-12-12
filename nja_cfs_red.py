@@ -953,10 +953,6 @@ class Hamiltonian():
 
 
 def Full_basis(conf):
-    #basis_l = label in |SLJ>
-    #n_el = numero di elettroni configurazione vera
-    #conf = configurazione vera
-    #per vera intendo non quelle corrispondenti nel caso di cose almost open shell
 
     n_el = int(conf[1:])
 
@@ -1238,8 +1234,6 @@ class calculation():
                 indices = np.lexsort((max_proj[:, 2], -max_proj[:, 1], -max_proj[:, 0]))  #the last one is the first criteria
             max_proj = max_proj[indices]
         else:   # fN configurations are in the weak field - High Spin situation
-            #copia i parametri e fai l'hamiltoniano con solo i contributi di Hee e Hso
-            #(l'implementazione sotto dovrebbe andare bene)
 
             if dic is None:
                 dic = free_ion_param_f_HF(conf)
@@ -1252,16 +1246,6 @@ class calculation():
             v = np.round(v, 16)  #numbers are saved as complex128 data type
             result = np.vstack((w,v))
             result = np.copy(result[:, result[0,:].argsort()])
-            # print(result[0,:].real-np.min(result[0,:].real))
-
-            # energy_print = np.around(result[0,:].real-np.min(result[0,:].real),8)
-            # energy_list, energy_count = np.unique(energy_print, return_counts=True)
-            # for i in range(len(energy_list)):
-            #     if energy_count[i]!=1:
-            #         deg_str = f' ({energy_count[i]})'
-            #     else:
-            #         deg_str = ''
-            #     print(f' {energy_list[i]:10.3f}'+deg_str+'\n' if wordy else "", end = "")
 
             projected = projection_basis(result[1:,:], self.basis_l)  #this gives just the order of spectroscopic terms of the free ion
 
@@ -1270,7 +1254,6 @@ class calculation():
                 s_proj = projected[i]
                 dlabel = list(s_proj.keys())
                 dvalue = np.array(list(s_proj.values()))
-                # max_proj.append(the_highest_L(s_proj, conf[0]+str(self.n))[0])   #corresponding conf for almost-closed
                 max_proj.append(dlabel[dvalue.argmax()])
 
             unique_max_proj = []
@@ -1283,17 +1266,11 @@ class calculation():
         basis_l_update = np.copy(self.basis_l)
         basis_l_JM_update = np.copy(self.basis_l_JM)
         nroots = np.zeros(len(roots))
-        # print('nroots', nroots)
         for i in range(len(roots)):
             for j in range(len(max_proj)):
                 if nroots[i] < roots[i][0]*roots[i][1] and int(max_proj[j][0])==roots[i][1]:
-                    # print('max_proj[j]', max_proj[j])
-                    # print(nroots[i], roots[i][0]*roots[i][1], int(max_proj[j][0]), roots[i][1], max_proj[j])
-                    # print('nroots[i] += ', eval(max_proj[j][0])*(2*state_legend(max_proj[j][1])+1))
                     nroots[i] += eval(max_proj[j][0])*(2*state_legend(max_proj[j][1])+1) #(eval(max_proj[j][max_proj[j].index('(')+1:max_proj[j].index(')')]))*2 +1 #eval(max_proj[j][0])*(2*state_legend(max_proj[j][1])+1) #
                     basis_update, basis_l_update, basis_l_JM_update, basis_proj, dic_LS_proj, basis_l_proj, basis_l_JM_proj = state_select(max_proj[j], basis_update, basis_l_update, basis_l_JM_update)
-                    # print(np.unique(basis_l_proj))
-                    # print('basis_update.size ', basis_update.size)
                     
                     if basis_update.size > 0:
                         if i==0 and 'basis_red' not in locals():
@@ -1802,7 +1779,7 @@ def mag_moment(basis):
         Li = statei[1]
         Ji = statei[2]/2.
         Mi = statei[3]/2.
-        seni = statei[-1]
+        seni = statei[4]
 
         for j in range(0,i+1):
             statej = basis[j]
@@ -1810,7 +1787,7 @@ def mag_moment(basis):
             Lj = statej[1]
             Jj = statej[2]/2.
             Mj = statej[3]/2.
-            senj = statej[-1]
+            senj = statej[4]
 
             if Li==Lj and Si==Sj and seni==senj:
                 integral, kL, gS = Zeeman(Li,Si,Ji,Mi,Lj,Sj,Jj,Mj,np.array([0.,0.,0.]))
@@ -1893,8 +1870,6 @@ def dfridr(func, x, h, idxi, shape, fargs):
 @jit(complex128[:,:](float64[:],float64[:,:],complex128[:,:]))
 def add_Zeeman(field_vec, basis, LF_matrix):
 
-    #print('add_Zeeman')
-
     matrix = np.zeros((basis.shape[0],basis.shape[0]),dtype=complex128)
     for i in range(basis.shape[0]):
         statei = basis[i]
@@ -1902,7 +1877,7 @@ def add_Zeeman(field_vec, basis, LF_matrix):
         Li = statei[1]
         Ji = statei[2]/2.
         Mi = statei[3]/2.
-        seni = statei[-1]
+        seni = statei[4]
 
         for j in range(0,i+1):
             statej = basis[j]
@@ -1910,7 +1885,7 @@ def add_Zeeman(field_vec, basis, LF_matrix):
             Lj = statej[1]
             Jj = statej[2]/2.
             Mj = statej[3]/2.
-            senj = statej[-1]
+            senj = statej[4]
 
             matrix[i,j] += LF_matrix[i,j]
             if i!=j:
@@ -1921,8 +1896,6 @@ def add_Zeeman(field_vec, basis, LF_matrix):
                 matrix[i,j] += integral[0]
                 if i!=j:
                     matrix[j,i] += np.conj(integral[0])
-
-    #print('matrix',matrix)
 
     return matrix
 
@@ -2194,7 +2167,7 @@ class Magnetics():
             Li = statei[1]
             Ji = statei[2]/2.
             MJi = statei[3]/2.
-            seni = statei[-1]
+            seni = statei[4]
             labeli = self.calc.dic_LS[':'.join([f'{qq}' for qq in statei])]
             for j in range(0,i+1):
                 statej = self.basis[j]
@@ -2202,7 +2175,7 @@ class Magnetics():
                 Lj = statej[1]
                 Jj = statej[2]/2.
                 MJj = statej[3]/2.
-                senj = statej[-1]
+                senj = statej[4]
                 labelj = self.calc.dic_LS[':'.join([f'{qq}' for qq in statej])]
                 H = Hamiltonian([seni,Li,Si,senj,Lj,Sj,Ji,MJi,Jj,MJj], [labeli,labelj], self.calc.conf, self.calc.dic_cfp, self.calc.tables, self.calc.dic_LS, self.calc.dic_LS_almost)  #self.conf è quella del main
                 if Li==Lj and Si==Sj and seni==senj:
@@ -4273,7 +4246,6 @@ def calc_ee_int(conf, closed_shell=False):
             Li = statei[1]
             Ji = statei[2]/2.
             MJi = statei[3]/2.
-            seni = statei[-1]
             labeli = calc.dic_LS[':'.join([f'{qq}' for qq in statei])]
 
             for j in range(0,i+1):
@@ -4282,7 +4254,6 @@ def calc_ee_int(conf, closed_shell=False):
                 Lj = statej[1]
                 Jj = statej[2]/2.
                 MJj = statej[3]/2.
-                senj = statej[-1]
                 labelj = calc.dic_LS[':'.join([f'{qq}' for qq in statej])]
 
                 if Ji==Jj and MJi==MJj and Li == Lj and Si == Sj:
