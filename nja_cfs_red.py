@@ -402,15 +402,26 @@ class Wigner_coeff():
 
 
 class CFP():
+    """
+    Handles the coefficients of fractional parentage (cfp) for a given electron configuration.
+
+    References:
+    1. Nielson - Koster in "Spectroscopic Coefficients for the p^n, d^n and f^n Configurations" (1963)
+
+    Attributes:
+    dic_LS_inv_almost (dict): An inverse dictionary for the LS-coupling scheme for the almost-closed-shell configuration.
+    l (int): The azimuthal quantum number.
+    n (int): The number of electrons in the almost-closed-shell configuration.
+    N (int): The number of electrons in the configuration.
+    closed (bool): A flag indicating whether the configuration is almost-closed-shell or not.
+    """
 
     def __init__(self, conf, dic_cfp, dic_LS_inv_almost=None):
-        #conf è del tipo l^(numero di elettroni)
-        #ATTENZIONE: il dic_LS che è qui non è della configurazione su cui sto facendo il calcolo, ma su quella corrispondente per i almost_closed_shell + 1
-        #ad esempio se sto facendo un d8, quindi con conf corrispondnte d2, il dic_LS è di d3
         """
         Initializes the CFP object with the given configuration, CFP dictionary, and optional LS-coupling scheme dictionary.
 
-        The configuration is represented by a string of the form 'l^x', where 'l' is orbital momentum quantum number (represented as 'd' for l=2 and 'f' for l=3), and 'x' is the number of electrons in the configuration.
+        The configuration is represented by a string of the form 'l^x', where 'l' is orbital momentum quantum number 
+        (represented as 'd' for l=2 and 'f' for l=3), and 'x' is the number of electrons in the configuration.
 
         Parameters:
         conf (str): The electron configuration.
@@ -423,8 +434,8 @@ class CFP():
         else:
             self.l = 3
 
-        self.n = int(conf[1:])  #elettroni closed conf
-        self.N = int(conf[1:])  #numero di elettroni vero
+        self.n = int(conf[1:])  
+        self.N = int(conf[1:])  
 
         self.dic_cfp = dic_cfp
 
@@ -444,23 +455,37 @@ class CFP():
 
 
     def cfp(self, v, L, S, name):
-        #returns the cfp for the given state
+        #The equation for the almost-closed-shell parameters calculation is given in 
+        # Nielson - Koster in "Spectroscopic Coefficients for the p^n, d^n and f^n Configurations" (1963)
+        """
+        Returns the cfps for a given state, identified by its L, S quantum number and the name of the state.
+
+        Parameters:
+        L (int): Orbital angular momentum quantum number
+        S (float): Spin angular momentum quantum number
+        name (str): The name of the state (from terms_labels()).
+
+        Returns:
+        cfp_list (numpy.ndarray): The list of CFPs for the given state.
+        """
 
         dic = self.dic_cfp 
 
-        # name = str(int(2*S+1))+state_legend(str(L), inv=True)+str(v)
         if self.closed==True:  
             cfp_list = []
             for keys in dic.keys():
                 values_list = [[key, float(val)] for key, val in dic[keys].items()]
                 values = sum(values_list, [])
                 for i in range(0,len(values),2):
+                    zz=1
+                    if self.N == 2*self.l:
+                        zz = (-1)**(v-1/2)
                     if values[i]==name:
                         term = self.dic_LS_inv_almost[keys][0] 
                         Sk = term[0]/2.
                         Lk = term[1]
                         N = self.N-1
-                        cfp_value = values[i+1]/((-1)**(Sk+S+Lk+L-self.l-0.5)*np.sqrt((N+1)*(2*S+1)*(2*L+1)/((4*self.l+2-N)*(2*Sk+1)*(2*Lk+1))))  #non vale per self.N = 2*self.l
+                        cfp_value = values[i+1]/(zz*(-1)**(Sk+S+Lk+L-self.l-0.5)*np.sqrt((N+1)*(2*S+1)*(2*L+1)/((4*self.l+2-N)*(2*Sk+1)*(2*Lk+1))))  
                         cfp_list.append([keys,cfp_value])
         else:
             cfp_list = [[key, float(val)] for key, val in dic[name].items()]
@@ -471,13 +496,12 @@ class CFP():
 
 
 class RME():  #RME(CFP)
-    #the equations are taken from BonnMag sup info (eq 10,11)
-    #or from E. Konig & S. Kremer "Ligand Field Energy Diagrams" (eq 2.85,2.87)
+    #from E. Konig & S. Kremer "Ligand Field Energy Diagrams" (eq 2.85,2.87)
     #or from Boca, "theoretical fundations of molecular magnetism" (Ch 8, p 516)
     """
-    A class to represent a reduced matrix element (RME) calculation for a given electron configuration.
-
-    This class is used to perform a RME calculation for a given electron configuration. The electron configuration is represented by a string of the form 'l^x', where 'l' is the azimuthal quantum number (represented as 'd' for l=2 and 'f' for l=3), and 'x' is the number of electrons in the configuration.
+    This class is used to perform a RME calculation for a given electron configuration. 
+    The electron configuration is represented by a string of the form 'l^x', where 'l' is the azimuthal quantum number 
+    (represented as 'd' for l=2 and 'f' for l=3), and 'x' is the number of electrons in the configuration.
 
     References:
     1. E. Konig & S. Kremer "Ligand Field Energy Diagrams" (eq 2.85,2.87)
@@ -490,16 +514,15 @@ class RME():  #RME(CFP)
     dic_LS_inv_almost (dict): An inverse dictionary for the LS-coupling scheme for the almost-closed-shell configuration.
     s (float): The spin quantum number.
     l (int): The azimuthal quantum number.
-    n (int): The number of electrons in the closed-shell configuration.
-    N (int): The total number of electrons in the configuration.
+    n (int): The number of electrons in the almost-closed-shell configuration.
+    N (int): The number of electrons in the configuration.
     cfp (CFP): A CFP object for the configuration.
-    closed (bool): A flag indicating whether the configuration is closed-shell or not.
+    closed (bool): A flag indicating whether the configuration is almost-closed-shell or not.
     """
 
-    def __init__(self, state, conf, dic_cfp, labels, dic_LS, dic_LS_inv_almost):#, CFP_obj):
-        #state contiene [v, L, S, v1, L1, S1]
-        #conf è del tipo nl^(numero di elettroni)
-        #ATTENZIONE: il dic_LS che è qui non è della configurazione su cui sto facendo il calcolo, ma su quella corrispondente per i almost_closed_shell + 1
+    def __init__(self, state, conf, dic_cfp, labels, dic_LS, dic_LS_inv_almost):
+        #state = [v, L, S, v1, L1, S1]
+        #WARNING: the dic_LS is the one from the corresponding configuration in case of almost closed-shell + 1
         """
         Initializes the RME object with the given state, configuration, CFP dictionary, labels, and LS-coupling scheme dictionaries.
 
@@ -532,9 +555,9 @@ class RME():  #RME(CFP)
         else:
             self.l = 3
 
-        self.n = int(conf[1:])  #elettroni closed conf
-        self.N = int(conf[1:])  #numero di elettroni vero
-        self.cfp = CFP(conf, dic_cfp, dic_LS_inv_almost) #cfp corretti per i closed shells
+        self.n = int(conf[1:])  #electrons closed conf
+        self.N = int(conf[1:])  #n. of electrons true
+        self.cfp = CFP(conf, dic_cfp, dic_LS_inv_almost) #cfp corrected for almost-closed-shell
 
         self.closed = False
         if self.l == 2 and self.n>5:
@@ -585,7 +608,7 @@ class RME():  #RME(CFP)
                     matrix = [[L, L1, k],[self.l, self.l, L_parent]]
                     somma +=  cfp_list[i,-1]*cfp_list1[j,-1]*(-1)**(L_parent+L+self.l+k)*Wigner_coeff.sixj_symbol(matrix)
 
-        if self.closed == True:# and closed==True:
+        if self.closed == True:
             return (-(-1)**k)*pref*somma
         else:
             return pref*somma
@@ -606,11 +629,8 @@ class RME():  #RME(CFP)
 
         pref = self.N*((self.s*(self.s+1)*(2*self.s+1)))**0.5*((2*self.S+1)*(2*self.L+1)*(2*self.S1+1)*(2*self.L1+1))**0.5
 
-        cfp_list = self.cfp.cfp(self.v, self.L, self.S, self.label1)  #i cfp sono già corretti per closed_shells
-        # print(self.v, self.L, self.S, cfp_list)
+        cfp_list = self.cfp.cfp(self.v, self.L, self.S, self.label1)  #cfps are already corrected for almost_closed_shells
         cfp_list1 = self.cfp.cfp(self.v1, self.L1, self.S1, self.label2)
-        # print(self.v1, self.L1, self.S1, cfp_list1)
-        # exit()
 
         somma = 0
         for i in range(len(cfp_list)):
@@ -621,22 +641,56 @@ class RME():  #RME(CFP)
                     matrix1 = [[self.S, self.S1, 1],[self.s, self.s, S_parent]]
                     matrix2 = [[self.L, self.L1, k],[self.l, self.l, L_parent]]
                     somma += cfp_list[i,-1]*cfp_list1[j,-1]*(-1)**(L_parent+S_parent+self.S+self.L+self.s+self.l+k+1)*Wigner_coeff.sixj_symbol(matrix1)*Wigner_coeff.sixj_symbol(matrix2)
-        # print(self.v, self.L, self.S)
-        # print(self.v1, self.L1, self.S1)
-        # print(pref*somma)
-        # exit()
+
         if self.closed == True:
             return (-1)**k*pref*somma
         else:
             return pref*somma
 
+
 class Hamiltonian():
+    """
+    This class presents the routines for the computation of the Hamiltonian matrix element for the given integral. 
+
+    References:
+    1. R. Boca, "A handbook of magnetochemical formulae". Elsevier, 2012.
+    2. R. Boca, "theoretical fundations of molecular magnetism" 1999. 
+    3. E. Konig & S. Kremer "Ligand Field Energy Diagrams" 1983.
+    4. C. Goerller-Walrand, K. Binnemans, Handbook of Physics & Chemistry of Rare Earths, Vol 23, Ch 155, 1996.
+
+    Attributes:
+    v, L, S, v1, L1, S1 (float): The quantum numbers for the state.
+    label1, label2 (str): The labels for the states.
+    dic_LS (dict): A dictionary for the LS-coupling scheme.
+    dic_LS_inv_almost (dict): An inverse dictionary for the LS-coupling scheme for the almost-closed-shell configuration.
+    s (float): The spin quantum number.
+    l (int): The azimuthal quantum number.
+    n (int): The number of electrons in the almost-closed-shell configuration.
+    N (int): The number of electrons in the configuration.
+    cfp (CFP): A CFP object for the configuration.
+    closed (bool): A flag indicating whether the configuration is almost-closed-shell or not.
+    """
 
     def __init__(self, state, labels, conf, dic_cfp=None, tables=None, dic_LS=None, dic_LS_almost=None):
-        #state contiene [v, L, S, v1, L1, S1, J, M, J1, M1]
+        #state = [v, L, S, v1, L1, S1, J, M, J1, M1]
         #labels = [label1, label2]
-        #conf è del tipo nl^(numero di elettroni)
-        #ATTENZIONE: il dic_LS qui è della configurazione sulla quale sto facendo il calcolo
+        """
+        Initializes the Hamiltonian object with the given state, configuration, CFP dictionary, labels, and LS-coupling scheme dictionaries.
+
+        The state is represented by a list of the form [v, L, S, v1, L1, S1, J, MJ, J1, MJ1], where 'v', 'L', 'S', 'J' and 'MJ' are the quantum numbers 
+        for the initial state and 'v1', 'L1', 'S1', 'J1' and 'MJ1' are the quantum numbers for the final state. 
+        The configuration is represented by a string of the form 'nl^x', where 'n' is the principal quantum number, 
+        'l' is the azimuthal quantum number (represented as 'd' for l=2 and 'f' for l=3), 
+        and 'x' is the number of electrons in the configuration.
+
+        Parameters:
+        state (list): The quantum numbers for the state.
+        labels (list): The labels for the states.
+        conf (str): The electron configuration.
+        dic_cfp (dict): A dictionary containing the coefficients of fractional parentage (CFP) for the configuration.
+        dic_LS (dict): A dictionary for the LS-coupling scheme.
+        dic_LS_inv_almost (dict): An inverse dictionary for the LS-coupling scheme for the almost-closed-shell configuration.
+        """
 
         self.v = state[0]
         self.L = state[1]
@@ -651,8 +705,6 @@ class Hamiltonian():
         self.label1 = labels[0]
         self.label2 = labels[1]
 
-        # print('state ', state)
-        # self.dic_LS = dic_LS
         self.conf = conf
         self.s = 0.5
         if conf[0]=='d':
@@ -674,7 +726,6 @@ class Hamiltonian():
         elif self.l == 3 and self.n<=7:
             pass
 
-        #self.cfp = CFP(conf)  #le conf che devo dare qui sono quelle del main
         if dic_cfp is not None:
             self.TAB = False
             if self.closed==True:
@@ -693,8 +744,20 @@ class Hamiltonian():
             self.rme = tables
     
     def electrostatic_int(self, basis, F0=0, F2=0, F4=0, F6=0, evaluation=True, tab_ee=None):
-        #equations are taken from Boca 1999, "theoretical fundations of molecular magnetism" (Ch 8, p 518) (valid only for l2 conf)
-        #for the d^n, f^1 and f^2 configurations the equations are reported in Boca 2012 (p 145 eq 4.66-4.69)
+        """
+        Computes electron repulsion integrals <self.label1|Hee|self.label2> for the given basis set.
+        Equations are taken from Boca 1999, "theoretical fundations of molecular magnetism" (Ch 8, p 518) (valid only for l2 conf)
+        For the d^n configurations the equations are reported in Boca2012 (p 145 eq 4.66-4.69)
+
+        Parameters:
+        basis (numpy.ndarray): The basis set for the calculation.
+        F0, F2, F4, F6 (float, optional): The F0, F2, F4, and F6 are the Slater-Condon parameters in cm^{-1}. F0 is irrelevant.
+        evaluation (bool, optional): A flag indicating whether the parameters are symbolic or numerical. Default is True.
+        tab_ee (dict, optional): A dictionary containing the electron-electron integrals. Default is None.
+
+        Returns:
+        integral (float): The calculated electron repulsion integral
+        """
 
         def l_Ck_l1(l, k, l1):
             return (-1)**l*np.sqrt((2*l+1)*(2*l1+1))*Wigner_coeff.threej_symbol([[l, k, l1],[0, 0, 0]])
@@ -748,7 +811,7 @@ class Hamiltonian():
                 ck_list[i] = ck
 
             return ck_list
-
+           
         #=======================================================================
 
         if evaluation==False:
@@ -786,11 +849,22 @@ class Hamiltonian():
                 integral += (ck[i] - ck_coeff[i])*coeff[i]
             else:
                 integral += ck[i]*coeff[i]
-
+        
         return integral
 
     def SO_coupling(self, zeta, k=1, evaluation=True):
-        #eq Konig & Kremer (Ch 2, p 11, eq 2.82)
+        """
+        Computes SOC integrals <self.label1|Hso|self.label2>.
+        Equations are taken from Konig & Kremer (Ch 2, p 11, eq 2.82)
+
+        Parameters:
+        zeat (float): The SOC parameter in cm^{-1}.
+        k (int, optional): The orbital reduction factor. Default is 1.
+        evaluation (bool, optional): A flag indicating whether the parameters are symbolic or numerical. Default is True.
+
+        Returns:
+        integral (float): The calculated SOC integral.
+        """
 
         if evaluation==False:
             zeta, k = sympy.symbols("zeta, k")
@@ -810,7 +884,18 @@ class Hamiltonian():
         return pref*coeff*rme_V1k
 
     def LF_contribution(self, dic_kq, evaluation=True):
-        # taken from C. Goerller-Walrand, K. Binnemans, Handbook of Physics & Chemistry of Rare Earths, Vol 23, Ch 155, (1996)
+        """
+        Computes the LF/CF contribution to the Hamiltonian matrix element <self.label1|HCF/LF|self.label2> using Bkq in Wybourne formalism.
+        Equations are taken from C. Goerller-Walrand, K. Binnemans, Handbook of Physics & Chemistry of Rare Earths, Vol 23, Ch 155, (1996).
+
+        Parameters:
+        dic_kq (dict): A dictionary containing the Bkq coefficients in cm^{-1}, e.g. dic_bkq = {'2':{'-1':0.0}} where k=2 and q=-1. 
+        The complete (complex) coefficient corresponds to Bkq + iBk-q. 
+        evaluation (bool, optional): A flag indicating whether the parameters are symbolic or numerical. Default is True.
+
+        Returns:
+        result (complex): The calculated LF/CF contribution to the Hamiltonian matrix element.
+        """
 
         if evaluation==False:
             for k in range(2,2*self.l+1,2):
@@ -835,6 +920,7 @@ class Hamiltonian():
                     Uk = self.rme['U'+str(k)][self.label1][self.label2]
                 except:
                     Uk = 0
+           
             coeff2 = Wigner_coeff.sixj_symbol([[self.J, self.J1, k],[self.L1, self.L, self.S]])
            
             integral = 0
@@ -857,8 +943,20 @@ class Hamiltonian():
 
         return result
 
-    def Zeeman(self, field=np.array([0.,0.,0.]), k=1, evaluation=True, MM=False, print_out=False):
-        # eq from Boca 2012 p 588
+    def Zeeman(self, field=np.array([0.,0.,0.]), k=1, evaluation=True, MM=False):
+        """
+        Computes the Zeeman contribution to the Hamiltonian matrix element <self.label1|HZeeman|self.label2> using the magnetic field.
+        Equations are taken from Boca2012, "A handbook of magnetochemical formulae" (p 588).
+
+        Parameters:
+        field (numpy.ndarray): The magnetic field vector in T.
+        k (int, optional): The rank of the tensor operator. Default is 1.
+        evaluation (bool, optional): A flag indicating whether the parameters are symbolic or numerical. Default is True.
+        MM (bool, optional): A flag indicating whether to return the L1 and S1 contributions. Default is False.
+
+        Returns:
+        int (complex): The calculated Zeeman contribution to the Hamiltonian matrix element.
+        """
 
         if evaluation ==False:
             Bx, By, Bz = sympy.symbols("Bx, By, Bz")
@@ -891,13 +989,26 @@ class Hamiltonian():
         if not MM:
             return int
         else:
-            if print_out:
-                print(L1)
-                print(S1)
             return L1, S1
 
 
 def Full_basis(conf):
+    """
+    Produces the complete basis set for a given configuration, saved in different format:
+    1. basis --> array: n. microstates x [2S, L, 2J, 2M, sen (,count)] 
+    2. dic_LS --> dict: '[2S, L, 2J, 2M, sen (,count)]': label as N. and K.
+    3. basis_l --> list: 2S+1 L (J)
+    4. basis_l_JM --> list: 2S+1 L (J) MJ
+
+    Parameters:
+    conf (str): The electron configuration.
+
+    Returns:
+    basis (numpy.ndarray): The complete basis set for the configuration.
+    dic_LS (dict): A dictionary for the LS-coupling scheme.
+    basis_l (numpy.ndarray): The labels for the states.
+    basis_l_JM (numpy.ndarray): The labels for the states (with MJ).
+    """
 
     n_el = int(conf[1:])
 
@@ -1010,10 +1121,43 @@ def diagonalisation(matrix, wordy=False):
     v = np.round(v,16)
     return w,v
 
+class calculation(): 
+    """
+    This is the main class of the code. Here the Hamiltonian matrix is computed and diagonalized.
+    Additionally, in this class the basis set can be reduced and the wavefunctions optimized.
 
-class calculation():  
+    Attributes:
+    conf (str): The electron configuration.
+    l (int): The azimuthal quantum number.
+    n (int): The number of electrons in the almost-closed-shell configuration.
+    N (int): The number of electrons in the configuration.
+    closed (bool): A flag indicating whether the configuration is almost-closed-shell or not.
+    basis (numpy.ndarray): The complete basis set for the configuration.
+    dic_LS (dict): A dictionary for the LS-coupling scheme.
+    basis_l (numpy.ndarray): The labels for the states.
+    basis_l_JM (numpy.ndarray): The labels for the states (with MJ).   
+    microst (int): The number of microstates.
+    ground (bool): A flag indicating whether the basis set includes only the ground multiplet.
+    dic_cfp (dict): A dictionary containing the coefficients of fractional parentage (cfp) for the configuration.
+    tables (dict): A dictionary containing the calculated RMEs.
+    dic_LS_almost (dict): An inverse dictionary for the LS-coupling scheme for the almost-closed-shell configuration.
+    dic_ee (dict): A dictionary containing the electron-electron integrals. 
+    """
+
 
     def __init__(self, conf, ground_only=False, TAB=False, wordy=True):
+        """
+        Initializes the calculation object through the definition of the type of configuration 
+        (almost closed shell or not), the basis set and additional dictionaries.
+        Additionally, it defines whether the RMEs are computed explicitly or read from tables 
+        (the computation of the RMEs will result in an increase of the computational time).
+
+        Parameters:
+        conf (str): The electron configuration.
+        ground_only (bool, optional): A flag indicating whether the basis set includes only the ground multiplet. Default is False.
+        TAB (bool, optional): A flag indicating whether the RMEs are calculated or read from tables. Default is False.
+        wordy (bool, optional): A flag indicating whether to print the output. Default is True.
+        """
 
         conf_list_d = ['d1','d2','d3','d4','d5','d6','d7','d8','d9']
         conf_list_f = ['f1','f2','f3','f4','f5','f6','f7','f8','f9','f10','f11','f12','f13']
@@ -1060,14 +1204,25 @@ class calculation():
 
         self.dic_cfp, self.tables, self.dic_LS_almost, self.dic_ee = self.Tables(TAB, stringa, conf)
 
-
     def ground_state_calc(self, ground=None):
-        #basis --> array: n. microstates x [2S, L, 2J, 2M, sen]
+        #basis --> array: n. microstates x [2S, L, 2J, 2M, sen (,count)]
         #dic_LS --> dict: '[2S, L, 2J, 2M, sen (,count)]': label as N. and K.
         #basis_l --> list: 2S+1 L (J)
         #basis_l_JM --> list: 2S+1 L (J) MJ
+        """
+        Reduces the basis set to the ground multiplet.
+
+        Parameters:
+        ground (str, optional): The ground multiplet. Default is None.
+
+        Returns:
+        basis_red (numpy.ndarray): The reduced basis set for the ground multiplet.
+        dic_LS_red (dict): A dictionary for the LS-coupling scheme for the ground multiplet.
+        basis_l_red (numpy.ndarray): The labels for the states for the ground multiplet (hence, only one type).
+        basis_l_JM_red (numpy.ndarray): The labels for the states (with MJ) for the ground multiplet.
+        """
         if ground is None:
-            ground = ground_term_legend(self.conf) #configurazione NOT almost closed
+            ground = ground_term_legend(self.conf) #conf NOT almost closed
         term_num = [(int(ground[0])-1), state_legend(ground[1]), eval(ground[ground.index('(')+1:ground.index(')')])*2]
         basis_red = []
         dic_LS_red = {}
@@ -1083,6 +1238,20 @@ class calculation():
         return basis_red, dic_LS_red, basis_l_red, basis_l_JM_red
 
     def Tables(self, TAB, stringa, conf):
+        """
+        Reads the RMEs from tables or computes them explicitly.
+
+        Parameters:
+        TAB (bool): A flag indicating whether the RMEs are calculated or read from tables.
+        stringa (str): The corresponding configuration.
+        conf (str): The electron configuration.
+
+        Returns:
+        dic_cfp (dict): A dictionary containing the coefficients of fractional parentage (cfp) for the configuration.
+        tables (dict): A dictionary containing the calculated RMEs.
+        dic_LS_almost (dict): An inverse dictionary for the LS-coupling scheme for the almost-closed-shell configuration.
+        dic_ee (dict): A dictionary containing the electron-electron integrals.
+        """
         
         if conf=='d1' or conf=='f1':
             if conf=='d1':
@@ -1123,16 +1292,28 @@ class calculation():
 
         return dic_cfp, tables, dic_LS_almost, dic_ee
 
-    def reduce_basis(self, conf, dic=None, contributes=None, roots = None, wordy=False):
+    def reduce_basis(self, conf, roots, dic=None, contributes=None, wordy=False):
         # reduce the basis set according to spin multiplicity
         # for dN configurations the Hund's rules are applied
         # for fN configurations the weak field - High Spin situation is considered and 
         # default parameters are taken from Ma, C. G., Brik, M. G., Li, Q. X., & Tian, Y. (2014) Journal of alloys and compounds, 599, 93-101.
 
-        # basis --> array: n. microstates x [2S, L, 2J, 2M, sen]
+        # basis --> array: n. microstates x [2S, L, 2J, 2M, sen (,count)]
         # dic_LS --> dict: '[2S, L, 2J, 2M, sen (,count)]': label as N. and K.
         # basis_l --> list: 2S+1 L (J)
         # basis_l_JM --> list: 2S+1 L (J) MJ
+        """
+        Reduces the basis set according to the spin multiplicity.
+        1. for dN configurations the Hund's rules are applied
+        2. for fN configurations the weak field - High Spin situation is considered and 
+        The default parameters are taken from Ma, C. G., Brik, M. G., Li, Q. X., & Tian, Y. (2014) Journal of alloys and compounds, 599, 93-101.
+
+        Parameters:
+        conf (str): The electron configuration.
+        roots (list, optional): A list containing the selected multiplicities as list of (sum(2*L+1), 2*S+1) pairs.
+        dic (dict, optional): A dictionary containing the parameters for the free ion. Default is None.
+        contributes (list, optional): A list containing the contributions to the matrix. Default is None.
+        """
 
         print('Performing basis reduction... \n' if wordy else "", end = "")
 
@@ -1238,7 +1419,49 @@ class calculation():
     #@cron
     def MatrixH(self, elem, F0=0, F2=0, F4=0, F6=0, zeta=0, k=1, dic_V=None, dic_bkq = None,dic_AOM = None, PCM = None, field = [0.,0.,0.], cfp_angles = None,wordy=False,
                       Orth=False, Norm=False, eig_opt=False, ground_proj=False, return_proj=False, save_label=False, save_LF=False, save_matrix=False):
-        #PCM is the old Stev
+        """
+        This is the core of the calculation. This functions converts the different CFPs formalism in the Wybourne one, it optimizes the wavefunction
+        composition, calls the function that builts the Hamiltonian and computes the wavefunctions composition.
+
+        Parameters:
+        elem (list): The contributions to the Hamiltonian matrix among: 
+                    'Hee'=interelectronic repulsion, 'Hso'=spin-orbit coupling, 
+                    'Hcf'=crystal-field/ligand-field contribution, 'Hz'=Zeeman splitting.
+        F0 (float, optional): The F0 Slater-Condon parameter in cm^{-1}. Default is 0.
+        F2 (float, optional): The F2 Slater-Condon parameter in cm^{-1}. Default is 0.
+        F4 (float, optional): The F4 Slater-Condon parameter in cm^{-1}. Default is 0.
+        F6 (float, optional): The F6 Slater-Condon parameter in cm^{-1}. Default is 0.
+        zeta (float, optional): The spin-orbit coupling parameter in cm^{-1}. Default is 0.
+        k (float, optional): The orbital reduction factor. Default is 1.
+        dic_V (dict, optional): A dictionary containing one-electron ligand field matrix elements. Default is None. 
+                                dic_V = {'11':0.0, '12':0, ...}, with key='ij', with 1<=i<=2*l+1 and j<=i.
+        dic_bkq (dict, optional): A dictionary containing the crystal field parameters in Wybourne formalism. Default is None.
+                                dic_bkq = {'k':{'q':0.0, '-q':0.0}, ...}, with k=2,4,..2*l and q=-k,-k+1,...k-1,k.
+        dic_AOM (dict, optional): A dictionary containing the crystal field parameters in AOM formalism. Default is None.
+                                dic_AOM = {'<ligand name>:[e_{sigma}, e_{pic}, e_{pis}, theta, phi, chi]}, where the angles are in degrees.
+        PCM (list, optional): A list for the definition of the PCM for crystal field calculation. Default is None.
+                              The first element of the list is the array dtype=object where each row is: '<ligand name>', x, y, z, charge.
+                              The charge is expressed as fraction of electronic charge. The coordinates are in Angstrom. 
+                              The metal center is assumed in (0,0,0). 
+                              The second element in the list is a boolean that defines if the coordinates are expressed as cartesian (False) or spherical (True).
+                              The third element is again a boolean and defines if the Sternheimer shielding parameters are used (True) or not (False).
+        field (list, optional): The magnetic field vector in Tesla. Default is [0.,0.,0.].  
+        cfp_angles (list, optional): A list containing the Euler angles or quaternions for the rotation of the crystal field parameters. Default is None.
+        wordy (bool, optional): A flag indicating whether to print the output. Default is False.
+        Orth (bool, optional): A flag indicating whether to perform the orthogonality check. Default is False.
+        Norm (bool, optional): A flag indicating whether to perform the normalization check. Default is False.
+        eig_opt (bool, optional): A flag indicating whether to optimize the wavefunction. Default is False.
+        ground_proj (bool, optional): A flag indicating whether to wavefunctions composition is computed or not. Default is False.
+        return_proj (bool, optional): A flag indicating whether to return the wavefunctions composition. Default is False.
+        save_label (bool, optional): A flag indicating whether to save the labels of the states. Default is False.
+        save_LF (bool, optional): A flag indicating whether to save the Hamiltonian matrix (without the Zeeman contribution). Default is False.
+        save_matrix (bool, optional): A flag indicating whether to save the Hamiltonian matrix. Default is False.
+
+        Returns:
+        result (numpy.ndarray): The eigenvalues and eigenvectors of the Hamiltonian matrix. The first row of the matrix are the eigenvalues.
+                                Each column of the matrix is an eigenvector.
+        projected (dict): The wavefunctions composition. The states are labeled as progressive numbers.
+        """
 
         print('\nPerforming calculation with the following contributions: \n' if wordy else "", end = "")
         print(str(elem)+'\n' if wordy else "", end = "")
@@ -4337,8 +4560,8 @@ def from_sph_to_car(coord_sph):
     return coord_car
 
 def terms_labels(conf):
-    #questi dati sono presi da Boca, "theoretical fundations of molecular magnetism" (Ch 8, p 381, Tab 8.4)
-    #oppure da OctoYot f_e_data.f90, TS_d_labels (seguono l'ordine di Nielson e Koster)
+    #from Boca, "theoretical fundations of molecular magnetism" (Ch 8, p 381, Tab 8.4)
+    #or OctoYot f_e_data.f90, TS_d_labels (following the order of Nielson e Koster)
 
     if conf[0]=='d' and int(conf[1:])>5:
         conf = 'd'+str(almost_closed_shells(conf))
