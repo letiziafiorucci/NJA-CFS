@@ -45,12 +45,24 @@ class color_term:
     END = '\033[0m'
 ##############
 
+#===================================================================================================
+### DECORATORS DEFINITION
+
 #if the second number of the version is even, numba is used
 numba_flag = False
 if eval(nja.__version__.split('.')[1])%2==0:
     numba_flag = True
 
 def test(func):
+    """
+    Decorator function to monitor the runtime of a function and the success of its execution.
+
+    Parameters:
+    func (function): The function to be decorated.
+
+    Returns:
+    wrapper (function): The decorated function with added functionality to print its runtime and success of execution.
+    """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         print(f"\nRunning test: "+color_term.BOLD+func.__name__+color_term.END)
@@ -91,6 +103,9 @@ def cron(func, *args, **kwargs):
         print(f'Runtime {func.__name__}: {run_time}\n')
         return return_values
     return new_func
+
+#===================================================================================================
+### TESTS DEFINITION 
 
 @test
 def test_CF_splitting():
@@ -149,7 +164,7 @@ def test_plot_Ediagram():
 
     conf = 'd8'
     calc = nja.calculation(conf, TAB=False, wordy=False)
-    basis, dic_LS, basis_l, basis_l_JM = nja.Full_basis(conf)
+    basis, _, basis_l, _ = nja.Full_basis(conf)
 
     dic_orca = nja.read_AILFT_orca6('test/calcsuscenisalfix.out', conf, method='CASSCF', return_V=False, rotangle_V=False, return_orcamatrix=False)
 
@@ -452,6 +467,8 @@ def test_PCM():  #with SIMPRE
     Comparison of the CFPs computed from a PCM in NJA-CFS and SIMPRE.
     There's a sign mismatch that does not affect the energy levels but it affects the sign of wavefunctions composition and 
     the tensorial properties. 
+
+    !!! Warning: part of this test has been deactivated
     """
 
     def read_out(J, directory=None):
@@ -877,7 +894,7 @@ def test_mag_moment():
 @test
 def test_mag_moment2():
     """
-    magnetic moments computation for a 4f9 configuration.
+    magnetic moments computation for a 4f^9 configuration.
     """
 
     basis = np.loadtxt('test/matrix_label_f9complete.txt')
@@ -890,6 +907,7 @@ def test_mag_moment2():
 @test
 def test_M_vector():
     """
+    Test the consistency with ab initio in the computation of the magnetization vector M for a 3d^3 CrF_6^{3-} complex.
     """
 
     conf = 'd3'
@@ -907,23 +925,23 @@ def test_M_vector():
 
     mu_matrix = nja.mag_moment(basis)
 
-    #print('dal test di M',mu_matrix)
     #conversion = a.u. * 2.35051756758e5 T
     M = nja.M_vector(np.array([0.0,0.0,23.5051756758]), mu_matrix, LF_matrix, basis, temp=1.0)  #in Bohr magnetons
 
     #from CrF63-.out CASSCF
-    M_AILFT = np.array([-0.0003645214756898332, -1.2322563787476262e-13, 1.4631881898029349])  #in atomic units
+    M_abinitio = np.array([-0.0003645214756898332, -1.2322563787476262e-13, 1.4631881898029349])  #in atomic units
 
-    ratio = M/M_AILFT/2
+    ratio = M/M_abinitio/2
 
     for i in range(len(ratio)):
         if np.abs(np.round(ratio[i],16)) > 0:
             assert np.round(ratio[i], 2) == 1.0
 
-# At low temperature, magnetization should be that of the ground state (approximately MS=-1/2,
-# having magnetization of <-1/2| Mz | -1/2> = - <-1/2|Sz|-1/2> = +1/2)
 @test
 def test_M_vector2():
+    """
+    Test to check that the magnetization vector M is actually that of the ground state for a 3d^3 CrF_6^{3-} complex at nearly 0 K.
+    """
 
     conf = 'd9'
     contributes = ['Hee', 'Hso', 'Hcf']
@@ -953,6 +971,9 @@ def test_M_vector2():
 
 @test
 def test_gtensor():
+    """
+    Test for the consistency of the NJA-computed effective g-tensor with the published results for the 4f^{13} YbDOTA complex.
+    """
 
     conf = 'f13'
     contributes = ['Hcf']
@@ -988,7 +1009,7 @@ def test_gtensor():
     result = calc.MatrixH(contributes, **dic, eig_opt=False)
     E = np.copy(result[0,:]).real
     energy_print = np.around(E-min(E),8)
-    energy_list, energy_count = np.unique(energy_print, return_counts=True)
+    energy_list, _ = np.unique(energy_print, return_counts=True)
 
     dic['field'] = np.array([0.0,0.0,1e-7*2.35051756758e5])
     Magn = nja.Magnetics(calc, ['Hcf','Hz'], dic)
@@ -1005,11 +1026,14 @@ def test_gtensor():
 
 @test
 def test_susceptibility_B_ord1():
+    """
+    Test the consistency with ab initio in the computation of the magnetic susceptibility tensor for the 3d^8 NiSAL-HDPT complex.
+    """
 
     conf = 'd8'
     contributes = ['Hee', 'Hcf', 'Hso']
 
-    #from NiSAL-HDPT calcsuscenisal_10.out NEVPT2
+    #from NiSAL-HDPT with NEVPT2
     #(xy yz z2 xz x2-y2)
     dic_V1_orca = {'11':-1537343.193973,
         '21':-197.966117, '22':-1536481.975521,
@@ -1028,11 +1052,11 @@ def test_susceptibility_B_ord1():
     dic = {'F2': 85687.2, 'F4': 48274.5, 'zeta': 643.4, 'dic_bkq': dic_Bkq}
 
     calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
-    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, save_label=True, save_LF=True)
     basis = np.loadtxt('matrix_label.txt')
     LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
 
-    #from NiSAL-HDPT calcsuscenisal_10.out NEVPT2
+    #from NiSAL-HDPT with NEVPT2
     chi_AILFT = np.array([[1.01328435e-31, 4.82628730e-33, 1.44940570e-32],[4.82628730e-33, 8.36113452e-32, 6.77342576e-33],[1.44940570e-32, 6.77342576e-33, 1.04818118e-31]])
     w,_ = np.linalg.eigh(chi_AILFT)
     w_av = np.sum(w)/3
@@ -1056,13 +1080,16 @@ def test_susceptibility_B_ord1():
 
 @test
 def test_susceptibility_B_ord1_2():
+    """
+    Test to prove the consistency between the two possible strategies to compute the magnetic susceptibility tensor for the 3d^8 NiSAL-HDPT complex.
+    """
 
     conf = 'd8'
     contributes = ['Hee', 'Hcf', 'Hso']
 
     from_au = 27.2113834*8065.54477
 
-    #from NiSAL-HDPT NiSAL_HDPT.out CASSCF
+    #from NiSAL-HDPT with CASSCF
     #(z2 xz yz x2-y2 xy)
     dic_V1_orca = {'11':-6.985156,
         '21':0.015107, '22':-6.970417,
@@ -1081,15 +1108,15 @@ def test_susceptibility_B_ord1_2():
     dic = {'F2': 93649.1, 'F4': 58398.0, 'zeta': 648.1, 'dic_bkq': dic_Bkq}
 
     calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
-    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
+    calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, save_label=True, save_LF=True)
     basis = np.loadtxt('matrix_label.txt')
     LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
     
-    chi_B_diff, err_B = nja.susceptibility_B_ord1(np.array([[0.0,0.0,0.0]]), 298., basis, LF_matrix, delta=1)
+    chi_B_diff, _ = nja.susceptibility_B_ord1(np.array([[0.0,0.0,0.0]]), 298., basis, LF_matrix, delta=1)
     
     Magn = nja.Magnetics(calc, ['Hee', 'Hcf', 'Hso','Hz'], dic)
 
-    chi_B = Magn.susceptibility_B_copy(fields=np.array([[0.0,0.0,0.0]]), temp=298., delta = 0.01)   #provare a mettere + e - differenza invece che + e 0
+    chi_B = Magn.susceptibility_B_copy(fields=np.array([[0.0,0.0,0.0]]), temp=298., delta = 0.01)  
 
     if not np.array_equal(np.round(chi_B_diff, 37),np.round(chi_B[0], 37)):
         print('chi_B_diff',chi_B_diff)
@@ -1099,6 +1126,9 @@ def test_susceptibility_B_ord1_2():
 
 @test
 def test_susceptibility_B_ord1_3():
+    """
+    Example of application of different representation strategies for the magnetic susceptibility tensor for the 4f^9 DyDOTA complex.
+    """
 
     conf = 'f9'
     contributes = ['Hcf']
@@ -1140,7 +1170,7 @@ def test_susceptibility_B_ord1_3():
     w,v = np.linalg.eig(chi_B_diff)
 
     nja.fig_tensor_rep_1(chi_B_diff)
-    #nja.fig_susc_field(conf, dic_Bkq)
+    # nja.fig_susc_field(conf, dic_Bkq)
 
     w,v = nja.princ_comp(w,v)
 
@@ -1157,67 +1187,11 @@ def test_susceptibility_B_ord1_3():
     assert chi_B_diff[0,0] > 1e-33
     assert err_B[0,0] < chi_B_diff[0,0]*1e-3
 
-
-# in weak-field / high-temperature limit, finite-field magnetization should be linear in external field
-@test
-def test_calc_susceptibility_zerofield():
-
-    conf = 'd8'
-    contributes = ['Hee', 'Hcf', 'Hso']
-
-    #conv for orca: 27.2113834*8065.54477 from a.u. to cm-1
-    from_au = 27.2113834*8065.54477
-    mu0 = 1.25663706212e-06
-    muB = 0.4668517532494337
-
-    #from NiSAL_HDPT.out CASSCF
-    #(z2 xz yz x2-y2 xy)
-    dic_V1_orca = {'11':-6.985156,
-        '21':0.015107, '22':-6.970417,
-        '31':0.010379, '32':0.007287, '33':-6.991948,
-        '41':-0.000188, '42':-0.009316, '43':0.004099, '44':-6.988073,
-        '51':0.008072, '52':0.011502, '53':-0.000819, '54':-0.002250, '55':-6.995262}
-    
-    #(z2 yz xz xy x2-y2)
-    dic_V = {'11':dic_V1_orca['11']*from_au,
-        '21':dic_V1_orca['31']*from_au, '22':dic_V1_orca['33']*from_au,
-        '31':dic_V1_orca['21']*from_au, '32':dic_V1_orca['32']*from_au, '33':dic_V1_orca['22']*from_au,
-        '41':dic_V1_orca['51']*from_au, '42':dic_V1_orca['53']*from_au, '43':dic_V1_orca['52']*from_au, '44':dic_V1_orca['55']*from_au,
-        '51':dic_V1_orca['41']*from_au, '52':dic_V1_orca['43']*from_au, '53':dic_V1_orca['42']*from_au, '54':dic_V1_orca['54']*from_au, '55':dic_V1_orca['44']*from_au}
-    
-    dic_Bkq = nja.from_Vint_to_Bkq(dic_V, conf)
-    dic = {'F2':93649.1, 'F4':58398.0, 'zeta':648.1, 'dic_bkq': dic_Bkq}
-
-    calc = nja.calculation(conf, ground_only=False, TAB=True, wordy=False)
-    result, projected = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True, save_label=True, save_LF=True)
-    basis = np.loadtxt('matrix_label.txt')
-    LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
-
-    mu_matrix = nja.mag_moment(basis)
-
-    field = np.array([0.0,0.0,1e-7*2.35051756758e5])
-    M = nja.M_vector(field, mu_matrix, LF_matrix, basis, temp=298.0)  #in Bohr magnetons
-    
-    #from NiSAL-HDPT.out CASSCF
-    M_AILFT = np.array([2.103121567385288e-5, 9.908963872165094e-6, 0.0001212081853327746])  #in atomic units
-
-    ratio = M/M_AILFT/2
-
-    for i in range(len(ratio)):
-        if np.abs(np.round(ratio[i],16)) > 0:
-            assert np.round(ratio[i], 2) == 1.0
-
-    chi, err_B = nja.susceptibility_B_ord1(np.array([field]), 298., basis, LF_matrix, delta=1.0)
-    M_av_linear = np.dot(chi,field)/(mu0*muB*1.9865e-23)
-
-    ratio = M/M_av_linear
-
-    for i in range(len(ratio)):
-        if np.abs(np.round(ratio[i],16)) > 0:
-            assert np.round(ratio[i], 2) == 1.0
-
 @test
 def test_reduction():
+    """
+    Test of the basis reduction functionality for the 4f^9 DyDOTA complex.
+    """
 
     conf = 'f9'
     contributes = ['Hee','Hso','Hcf']
@@ -1250,6 +1224,9 @@ def test_reduction():
 
 @test
 def test_reduction_2():
+    """
+    Test of the basis reduction functionality for the 4f^9 Dybbpn complex.
+    """
 
     conf = 'f9'
     contributes = ['Hee','Hso','Hcf']
@@ -1285,9 +1262,105 @@ def test_reduction_2():
 
     basis = np.loadtxt('matrix_label.txt')
     LF_matrix = np.load('matrix_LF.npy', allow_pickle=True, fix_imports=False)
-    chi_B_diff, err_B = nja.susceptibility_B_ord1(np.array([[0.0,0.0,0.0]]), 298., basis, LF_matrix, delta=1)
+    chi_B_diff, _ = nja.susceptibility_B_ord1(np.array([[0.0,0.0,0.0]]), 298., basis, LF_matrix, delta=1)
 
     assert np.allclose(chi, chi_B_diff, atol=1e-37, rtol=2)
+
+@test
+def test_conv_Vint_Bkq_d():
+    """
+    Test for the consistency in calculations between one perfomed with dic_Bkq and the other with the set of dic_Bkq backcomputed from the V^{LF} of AILFT
+    """
+
+    conf = 'd8'
+    contributes = ['Hee', 'Hcf', 'Hso']
+
+    #from NiSAL-HDPT with NEVPT2
+    #(xy yz z2 xz x2-y2)
+    dic_V1_orca = {'11':-1537343.193973,
+        '21':-197.966117, '22':-1536481.975521,
+        '31':2138.341330, '32':2620.966044, '33':-1534906.147670,
+        '41':2944.032701, '42':1955.080014, '43':3930.351693, '44':-1531161.910464,
+        '51':-599.165743, '52':1115.150600, '53':102.275178, '54':-2462.285886, '55':-1535571.155802}
+    
+    #(z2 yz xz xy x2-y2)
+    dic_V = {'11':dic_V1_orca['33'],
+        '21':dic_V1_orca['32'], '22':dic_V1_orca['22'],
+        '31':dic_V1_orca['43'], '32':dic_V1_orca['42'], '33':dic_V1_orca['44'],
+        '41':dic_V1_orca['31'], '42':dic_V1_orca['21'], '43':dic_V1_orca['41'], '44':dic_V1_orca['11'],
+        '51':dic_V1_orca['53'], '52':dic_V1_orca['52'], '53':dic_V1_orca['54'], '54':dic_V1_orca['51'], '55':dic_V1_orca['55']}
+
+    dic_Bkq = nja.from_Vint_to_Bkq(dic_V, conf)
+    dic_Bkq['0']['0'] = 0
+    dic = {'F2': 85687.2, 'F4': 48274.5, 'zeta': 643.4, 'dic_bkq': dic_Bkq}
+
+    calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+    result1, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+    
+    dic_V1 = nja.from_Vint_to_Bkq_2(2, dic_Bkq, reverse=True)
+    dic_Bkq = nja.from_Vint_to_Bkq(dic_V1, conf)
+    dic_Bkq['0']['0'] = 0
+    dic = {'F2': 85687.2, 'F4': 48274.5, 'zeta': 643.4, 'dic_bkq': dic_Bkq}
+    
+    calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+    result2, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+    
+    assert np.allclose(result1.real, result2.real)
+    assert np.allclose(result1.imag, result2.imag)
+
+    dic = {'F2': 85687.2, 'F4': 48274.5, 'zeta': 643.4, 'dic_V': dic_V1}
+
+    calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+    result3, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+
+    assert np.allclose(result1.real, result3.real)
+    assert np.allclose(result1.imag, result3.imag)
+    
+@test
+def test_conv_Vint_Bkq_f():
+    """
+    Test for the consistency in calculations between one perfomed with dic_Bkq and the other with the set of dic_Bkq backcomputed from the V^{LF} of AILFT
+    The check in this case is only on the energies. This is caused by a very small difference between the original Bkq and those backcomputed from V^{LF}.
+    which is consequence of the conditioning number of the matrix that converts dic_V in dic_Bkq back and forth being low but not 0 (and slightly higher compared to the d one).
+    This alteration in the eigenfunctions does not affect the composition of the states in %.
+    """
+
+    conf = 'f13'
+    contributes = ['Hee', 'Hcf', 'Hso']
+
+    dic = nja.read_AILFT_orca6('test/run_YbDOTA.out', conf)
+    dic2 = dic.copy()
+
+    calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+    result1, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+    
+    dic_V1 = nja.from_Vint_to_Bkq_2(3, dic['dic_bkq'], reverse=True)
+    dic_Bkq = nja.from_Vint_to_Bkq_2(3, nja.read_AILFT_orca6('test/run_YbDOTA.out', conf, return_V=True))
+    dic['dic_bkq'] = dic_Bkq
+
+    for k in range(0,7,2):
+        for q in range(-k, k+1, 1):
+            if k in dic2.keys() and q in dic2[str(int(k))].keys():
+                assert dic_Bkq[str(int(k))][str(int(q))]==dic2[str(int(k))][str(int(q))]
+    
+    calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+    result2, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+    
+    assert np.allclose(result1[0,:].real, result2[0,:].real, rtol=2, atol=1e-3)
+    #assert np.allclose(result1.imag, result2.imag, rtol=2, atol=1e-3)
+
+    # remove dic_bkq from dic
+    del dic['dic_bkq']
+    dic['dic_V'] = dic_V1
+
+    calc = nja.calculation(conf, ground_only=False, TAB=False, wordy=False)
+    result3, _ = calc.MatrixH(contributes, **dic, eig_opt=False, wordy=False, ground_proj=True, return_proj=True)
+
+    assert np.allclose(result1[0,:].real, result3[0,:].real, rtol=2, atol=1e-3)
+    #assert np.allclose(result1.imag, result3.imag, rtol=2, atol=1e-3)
+
+#===================================================================================================
+### OTHER EXAMPLES
 
 def eigenfunction_optimization_opt():
 
@@ -1517,16 +1590,21 @@ def Susceptibility_Tdep():
     plt.legend()
     plt.savefig('dydota_tempdep.png', dpi=600)
 
+#===================================================================================================
+### MAIN
+
 if __name__ == '__main__':
 
-    #### test graphical representations
+    #### tests with plots
     # test_plot_Ediagram()
     # test_plot_Ediagram_PCM()
     # test_CF_splitting()
     # test_TanabeSugano()
     # test_plot_magnetization_field()
+    # test_susceptibility_B_ord1_3()  #f9
+    # test_torque()
 
-    #### actual tests
+    #### tests
     test_conv_AqkrkBkq() #f11
     test_conv_Vint_Bkq_d() #d8
     test_PCM() #f9
@@ -1543,11 +1621,10 @@ if __name__ == '__main__':
     test_gtensor()  #f13
     test_susceptibility_B_ord1()  #d8
     test_susceptibility_B_ord1_2()  #d8
-    test_susceptibility_B_ord1_3()  #f9
-    test_calc_susceptibility_zerofield()  #d8
-    test_torque()
     test_reduction()
     test_reduction_2()
+    test_conv_Vint_Bkq_d()
+    test_conv_Vint_Bkq_f()
 
     #### other examples
     # eigenfunction_optimization_opt()

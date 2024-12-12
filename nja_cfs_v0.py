@@ -2309,19 +2309,7 @@ class Magnetics():
             print('M '+str(M_list[i])+'\n' if wordy else "", end = "")
             print('chi '+str(susc_list[i])+'\n' if wordy else "", end = "")
 
-        idxM = np.argmax(M_list)
-        idxm = np.argmin(M_list)
-
-        M_av = np.sum(M_list)/len(M_list)
-        sopra, sotto = 0,0
-        for i in range(len(M_list)):
-            if M_list[i]>M_av:
-                sopra += 1
-            else:
-                sotto += 1
-
-
-        return M_list, susc_list, fields[idxM], fields[idxm], idxM, idxm, (sopra, sotto)
+        return M_list, susc_list
     
 
     def susceptibility_B_copy(self, fields, temp, delta=0.001, wordy=False):
@@ -2688,7 +2676,6 @@ def fig_tensor_rep_1(tensor, n_points=40):
     points = np.stack((x.ravel(), y.ravel(), z.ravel()), axis=1)  # Shape: (N, 3)
     points = points / np.linalg.norm(points, axis=1)[:, np.newaxis]
 
-    # Initialize result array
     N = points.shape[0]
     magnitudes = np.zeros(N)
 
@@ -2704,11 +2691,9 @@ def fig_tensor_rep_1(tensor, n_points=40):
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111, projection='3d')
 
-    # Normalize magnitudes for coloring
     norm = plt.Normalize(magnitudes.min(), magnitudes.max())
     colors = plt.cm.turbo(norm(magnitudes).reshape(x.shape))
 
-    # Plot the surface with facecolors based on magnitudes
     ax.plot_surface(x_scaled, y_scaled, z_scaled, facecolors=colors, edgecolor='k', alpha=1, linewidth=0.5)
 
     # Set transparent background
@@ -2722,21 +2707,17 @@ def fig_tensor_rep_1(tensor, n_points=40):
     ax.set_ylabel('y')
     ax.set_zlabel('z')
 
-    # Calculate the limits for each axis
     x_limits = [x_scaled.min(), x_scaled.max()]
     y_limits = [y_scaled.min(), y_scaled.max()]
     z_limits = [z_scaled.min(), z_scaled.max()]
 
-    # Determine the widest range
     all_limits = np.array([x_limits, y_limits, z_limits])
     widest_range = all_limits.max() - all_limits.min()
 
-    # Set all axes to the same range
     ax.set_xlim(all_limits.min(), all_limits.min() + widest_range)
     ax.set_ylim(all_limits.min(), all_limits.min() + widest_range)
     ax.set_zlim(all_limits.min(), all_limits.min() + widest_range)
 
-    # Add a colorbar
     mappable = plt.cm.ScalarMappable(cmap='turbo', norm=norm)
     mappable.set_array(magnitudes)
     plt.colorbar(mappable, ax=ax, shrink=0.5, aspect=8)
@@ -2794,7 +2775,7 @@ def fig_susc_field(conf, dic_Bkq, temp=2., n_points=20, delta=0.01):
         dic['dic_bkq'] = dic_Bkq
 
         Magn = Magnetics(calc, ['Hcf','Hz'], dic)
-        _, susc_field, *_ = Magn.susceptibility_field(fields=field_vecs, temp=temp, delta = delta, wordy=wordy)
+        _, susc_field = Magn.susceptibility_field(fields=field_vecs, temp=temp, delta = delta, wordy=wordy)
 
         return susc_field
 
@@ -2808,10 +2789,10 @@ def fig_susc_field(conf, dic_Bkq, temp=2., n_points=20, delta=0.01):
 
     points = points / np.linalg.norm(points, axis=1)[:, np.newaxis]
 
-    magnitudes = use_nja_(conf, dic_Bkq, points, wordy=True)
+    magnitudes = use_nja_(conf, dic_Bkq, points)
 
     #subtract the average
-    #magnitudes -= np.average(magnitudes)
+    magnitudes -= np.average(magnitudes)
 
     x_scaled = (x.ravel() * magnitudes).reshape(x.shape)
     y_scaled = (y.ravel() * magnitudes).reshape(y.shape)
@@ -2874,10 +2855,10 @@ def fig_rep_magnfield(Mvec, xyz, data=None):
         for i in range(data.shape[0]):
             vector = data[i,1:-1]
             ax.plot([0.,vector[0]],[0.,vector[1]],[0.,vector[2]],'--',lw=0.2,c='k')
-            if data[i,0] in nja.color_atoms().keys():
-                ax.scatter(vector[0],vector[1],vector[2],'o',c = nja.color_atoms()[data[i,0]],lw=3)
+            if data[i,0] in color_atoms().keys():
+                ax.scatter(vector[0],vector[1],vector[2],'o',c = color_atoms()[data[i,0]],lw=3)
             else:
-                ax.scatter(vector[0],vector[1],vector[2],'o',c = nja.color_atoms()['_'],lw=3)
+                ax.scatter(vector[0],vector[1],vector[2],'o',c = color_atoms()['_'],lw=3)
             ax.text(vector[0]+0.4*np.sign(vector[0]),vector[1]+0.4*np.sign(vector[1]),vector[2]+0.4*np.sign(vector[2]),data[i,-1], size=8)
 
     ax.set_xlim(-4, 4)
