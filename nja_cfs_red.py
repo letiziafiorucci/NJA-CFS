@@ -1559,6 +1559,29 @@ class calculation():
 
     # @cron
     def build_matrix(self, elem, F0=0, F2=0, F4=0, F6=0, zeta=0, k=1, dic_bkq = None, field = [0.,0.,0.], save_label=False, save_LF=False, save_matrix=False):
+        """
+        Builds the Hamiltonian matrix.
+
+        Parameters:
+        elem (list): The contributions to the Hamiltonian matrix among: 
+                    'Hee'=interelectronic repulsion, 'Hso'=spin-orbit coupling, 
+                    'Hcf'=crystal-field/ligand-field contribution, 'Hz'=Zeeman splitting.
+        F0 (float, optional): The F0 Slater-Condon parameter in cm^{-1}. Default is 0.
+        F2 (float, optional): The F2 Slater-Condon parameter in cm^{-1}. Default is 0.
+        F4 (float, optional): The F4 Slater-Condon parameter in cm^{-1}. Default is 0.
+        F6 (float, optional): The F6 Slater-Condon parameter in cm^{-1}. Default is 0.
+        zeta (float, optional): The spin-orbit coupling parameter in cm^{-1}. Default is 0.
+        k (float, optional): The orbital reduction factor. Default is 1.
+        dic_bkq (dict, optional): A dictionary containing the crystal field parameters in Wybourne formalism. Default is None.
+                                  dic_bkq = {'k':{'q':0.0, '-q':0.0}, ...}, with k=2,4,..2*l and q=-k,-k+1,...k-1,k.
+        field (list, optional): The magnetic field vector in Tesla. Default is [0.,0.,0.].
+        save_label (bool, optional): A flag indicating whether to save the labels of the states. Default is False.
+        save_LF (bool, optional): A flag indicating whether to save the Hamiltonian matrix (without the Zeeman contribution). Default is False.
+        save_matrix (bool, optional): A flag indicating whether to save the Hamiltonian matrix. Default is False.
+
+        Returns:
+        matrix (numpy.ndarray): The Hamiltonian matrix (complex).
+        """
 
         F = F0, F2, F4, F6
 
@@ -1657,6 +1680,20 @@ class calculation():
 
     @staticmethod
     def opt_eigenfunction_minimization(calc, dic_Bkq, shape):
+        """
+        Wavefunction optimization algorithm. It's based on the maximization of a single component of the ground state wavefunction
+        using the dual anneling minimization algorithm implemented in scipy.
+
+        Parameters:
+        calc (object): The instance of the class.
+        dic_Bkq (dict): A dictionary containing the crystal field parameters in Wybourne Default is None.
+                        dic_bkq = {'k':{'q':0.0, '-q':0.0}, ...}, with k=2,4,..2*l and q=-k,-k+1,...k-1,k.
+        shape (int): The shape of the ground state wavefunction.
+
+        Returns:
+        dic_rot (dict): A dictionary containing the rotated crystal field parameters.
+        quat (list): A list containing the quaternion for the rotation of the crystal field parameters.
+        """
 
         from scipy.optimize import dual_annealing
         from scipy.optimize import least_squares
@@ -1701,6 +1738,20 @@ class calculation():
 
     @staticmethod
     def opt_eigenfunction_grid(calc, dic_Bkq, shape):
+        """
+        Wavefunction optimization algorithm. It's based on a grid search, using REPULSION angles (evenly sampled on a sphere), 
+        read from crystdat.py.
+
+        Parameters:
+        calc (object): The instance of the class.
+        dic_Bkq (dict): A dictionary containing the crystal field parameters in Wybourne Default is None.
+                        dic_bkq = {'k':{'q':0.0, '-q':0.0}, ...}, with k=2,4,..2*l and q=-k,-k+1,...k-1,k.
+        shape (int): The shape of the ground state wavefunction.
+
+        Returns:
+        dic_rot (dict): A dictionary containing the rotated crystal field parameters.
+        quat (list): A list containing the quaternion for the rotation of the crystal field parameters.
+        """
 
         import time
 
@@ -1715,7 +1766,7 @@ class calculation():
         x = np.zeros(shape)
         x[-1] = 1
 
-        rep_cryst = np.array(crystdat.rep678_cryst)
+        rep_cryst = np.array(crystdat.rep678_cryst)  #change here the name of the grid to select smaller or bigger grids from cristdat.py
 
         target_list = []
 
@@ -2307,8 +2358,36 @@ def susceptibility_field(fields, temp, basis, LF_matrix, delta=0.001):
 #======================= MAGNETIC PROPERTIES ==============================
 
 class Magnetics():
+    """
+    Class for magnetic properties calculations.
+
+    References:
+    1. R. Boca, "theoretical fundations of molecular magnetism" 1999.
+
+    Attributes:
+    result (np.array): eigenvalue and eigenvectors of the Hamiltonian matrix.
+    par_dict (dict): dictionary of parameters used in the calculation.
+    calc (Calculation): instance of the Calculation class.
+    basis (np.array): basis of the Hamiltonian matrix.
+    Hterms (list): The contributions to the Hamiltonian matrix among: 
+                    'Hee'=interelectronic repulsion, 'Hso'=spin-orbit coupling, 
+                    'Hcf'=crystal-field/ligand-field contribution, 'Hz'=Zeeman splitting.
+    kB (float): Boltzmann constant.
+    mu0 (float): vacuum permeability.
+    muB (float): Bohr magneton.
+    """
 
     def __init__(self, calc, contributes, par):
+        """
+        Initializes the Magnetics class, computing the 0 field results.
+
+        Parameters:
+        calc (Calculation): instance of the Calculation class.
+        contributes (list): The contributions to the Hamiltonian matrix among: 
+                            'Hee'=interelectronic repulsion, 'Hso'=spin-orbit coupling,
+                            'Hcf'=crystal-field/ligand-field contribution, 'Hz'=Zeeman splitting.
+        par (dict): dictionary of parameters used in the calculation.
+        """
 
         self.result = calc.MatrixH(contributes, **par, wordy=True)
         self.par_dict = calc.par_dict
@@ -2324,6 +2403,16 @@ class Magnetics():
     def mag_moment(self, k=1, evaluation=True):
         #costruction of magnetic moment matrix as kL+geS
         #y component is divided by i (imaginary unit)
+        """
+        Computes the magnetic moment matrix.
+
+        Parameters:
+        k (int, optional): orbital reduction factor.
+        evaluation (bool, optional): A flag indicating whether the parameters are symbolic or numerical. Default is True.
+        
+        Returns:
+        matrix (numpy.ndarray): the magnetic moment matrix (complex).
+        """
 
         if not evaluation:
             matrix = np.zeros((3, self.basis.shape[0],self.basis.shape[0]),dtype=object)
@@ -2367,7 +2456,18 @@ class Magnetics():
         return matrix
 
     #@staticmethod
-    def effGval(self, levels, v_matrix=None): 
+    def effGval(self, levels, v_matrix=None):
+        """
+        Computes the effective g-matrix for the Kramers doublets specified.
+
+        Parameters:
+        levels (list): list of the Kramers doublet levels, e.g. [(1,2), (3,4)].
+        v_matrix (numpy.ndarray, optional): eigenvectors of the Hamiltonian matrix. Default is None.
+
+        Returns:
+        np.sqrt(2*w) (numpy.ndarray): eigenvalues of the g-matrix.
+        v (numpy.ndarray): eigenvectors of the g-matrix.
+        """ 
 
         if v_matrix is None:
             par = self.par_dict
@@ -2419,6 +2519,19 @@ class Magnetics():
 
 
     def susceptibility_field(self, fields, temp, delta=0.001, wordy=False):
+        """
+        Computes the scalar magnetization and magnetic susceptibility fields, for a set of field vectors (evenly sampled on a sphere) at a certain temperature.
+
+        Parameters:
+        fields (numpy.ndarray): field vectors (shape = N x 3, in T).
+        temp (float): temperature in K.
+        delta (float, optional): differentiation step in T. Default is 0.001.
+        wordy (bool, optional): A flag indicating whether to print the results. Default is False.
+
+        Returns:
+        M_list (numpy.ndarray): scalar magnetization field (SI unit).
+        susc_list (numpy.ndarray): scalar magnetic susceptibility field (SI unit).
+        """
 
         par = self.par_dict
 
@@ -2435,7 +2548,7 @@ class Magnetics():
             weights = fields[i]/np.linalg.norm(fields[i])
             matrix = self.calc.build_matrix(self.Hterms, **par) 
             result = from_matrix_to_result(matrix)
-            E = (result[0,:].real-min(result[0,:].real)) #* 1.9865e-23   
+            E = (result[0,:].real-min(result[0,:].real)) 
 
             den = 0
             num = 0
@@ -2455,7 +2568,7 @@ class Magnetics():
             par['field'] = fields[i]+B_inc
             matrix = self.calc.build_matrix(self.Hterms, **par)  
             result = from_matrix_to_result(matrix)
-            E = (result[0,:].real-min(result[0,:].real)) #* 1.9865e-23   # per convertire da cm-1 a J
+            E = (result[0,:].real-min(result[0,:].real)) 
             den = 0
             num = 0
             for ii in range(len(E)):
@@ -2474,7 +2587,7 @@ class Magnetics():
             par['field'] = fields[i]-B_inc
             matrix = self.calc.build_matrix(self.Hterms, **par)  
             result = from_matrix_to_result(matrix)
-            E = (result[0,:].real-min(result[0,:].real)) #* 1.9865e-23   # per convertire da cm-1 a J
+            E = (result[0,:].real-min(result[0,:].real)) 
             den = 0
             num = 0
             for ii in range(len(E)):
@@ -2499,16 +2612,27 @@ class Magnetics():
     
 
     def susceptibility_B_copy(self, fields, temp, delta=0.001, wordy=False):
-        # computes the magnetic susceptibility tensor as the derivative of the magnetization vector in x,y,z
-        # for a set of field vectors (evenly sampled on a sphere) at a certain temperature
-        # delta is the differentiation step
+        """
+        Computes the magnetic susceptibility tensor as the derivative of the magnetization vector in x,y,z,
+        for a set of field vectors (evenly sampled on a sphere). The values are then averaged among the 
+        different directions of the magnetic field vector, hence it is generally enough to pass a single field vector 
+        as e.g. np.array([[0,0,1]]) (fields needs to be bidimensional).
+
+        Parameters:
+        fields (numpy.ndarray): field vectors (shape = N x 3, in T). 
+        temp (float): temperature in K.
+        delta (float, optional): differentiation step in T. Default is 0.001.
+        wordy (bool, optional): A flag indicating whether to print the results. Default is False.
+
+        Returns:
+        chi_tensor (numpy.ndarray): magnetic susceptibility tensor (SI unit).
+        Mav (numpy.ndarray): magnetization vector (SI unit).
+        """
 
         def M_vector_in(field_vec):
             mu = np.zeros((self.basis.shape[0], 3), dtype='complex128')
             par['field'] = field_vec
-            # print(field_vec)
             matrix = self.calc.build_matrix(self.Hterms, **par)  #hamiltonian matrix for a field vector B
-            # print('old',matrix)
             result = from_matrix_to_result(matrix)
             E = (result[0,:].real-min(result[0,:].real)) #* 1.9865e-23
             E -= min(E)
@@ -2516,12 +2640,10 @@ class Magnetics():
             M = np.zeros(3)
 
             for kk in range(3):
-                CI=1
                 den = 0
                 num = 0
                 for ij in range(len(E)):
-                    mu_single = np.dot(np.conj(result[1:,ij]).T, np.dot(CI*mu_matrix[kk,...],result[1:,ij]))   # <i|mu_kk|i> for i in range N and for kk=x,y,z
-                    # mu_single = np.dot(np.conj(np.ascontiguousarray(result[1:, ij]).T), np.dot(CI * mu_matrix[kk, ...], np.ascontiguousarray(result[1:, ij])))
+                    mu_single = np.dot(np.conj(result[1:,ij]).T, np.dot(mu_matrix[kk,...],result[1:,ij]))   # <i|mu_kk|i> for i in range N and for kk=x,y,z
                     if np.abs(np.copy(mu[ij,kk]).imag)<1e-15:
                         mu[ij,kk] += np.copy(mu_single.real)
                     else:
@@ -2542,7 +2664,6 @@ class Magnetics():
             k=1
 
         Mag_vector = np.zeros((fields.shape[0],3))
-        mu = np.zeros((fields.shape[0], self.basis.shape[0], 4, 3), dtype='complex128')
         chi = np.zeros((fields.shape[0], 3, 3))
         mu_matrix = self.mag_moment(k)  #computes the magnetic moments matrix <i|kL + geS|j>
 
@@ -2564,14 +2685,8 @@ class Magnetics():
                 field_dec[comp, comp] -= delta
                 M_dec[comp,:] = M_vector_in(np.round(field_dec[comp],16))   #same for decrement
 
-           # print('M_inc', M_inc)
-
             for kki in range(3):
                 for kkj in range(3):
-                    # print(M_inc[kkj,kki],M[kki],M_inc[kkj,kki]-M[kki])
-                    # chi[i,kki,kkj] = ((M_inc[kkj,kki]-M[kki])/delta)*self.mu0*self.muB*1.9865e-23     #computation of the chi tensor as the derivative of the magnetizaion vector with respect to the magnetic field vector
-                                                                                                      #chi_ab = dMb(a)/dBa, where a,b = x,y,z
-                    #print('check',M_inc[kkj,kki],M_dec[kkj,kki],M_inc[kkj,kki]-M_dec[kkj,kki],2*delta)
                     chi[i,kki,kkj] = ((M_inc[kkj,kki]-M_dec[kkj,kki])/(2*delta))*self.mu0*self.muB*1.9865e-23
 
             print('M (BM)\n'+str(M)+'\n' if wordy else "", end = "")
@@ -2588,8 +2703,24 @@ class Magnetics():
     # @cron
     ### COPY OF THE NUMBA FUNCTIONS ###
     def dfridr(self, func, x, h, idxi, shape, fargs):
+        """
+        returns the derivative of the function at a point x by Ridders' method of polynomial extrapolation. 
+        The value h is input as an estimated initial stepsize. It has to be bigger than the one you would pass to a standard numerical differentiation method. 
+        The stepsize is decreased by CON at each iteeration. Max size of tableau is set by NTAB.
+        See NJA-CFS documentation for references.
 
-        # print(idxi)
+        Parameters:
+        func (function): function to differentiate.
+        x (numpy.ndarray): differentiation variable.
+        h (float): step size.
+        idxi (int): index of the differentiation variable.
+        shape (tuple): shape of the output.
+        fargs (tuple): additional arguments for the function.
+
+        Returns:
+        risultato (numpy.ndarray): result of the differentiation.
+        err (float): error estimation of the differentiation.
+        """
 
         CON = h*2 #* 2  #10  #if this is too high the error at the end will be higher, but if it's too low the result will be always 0
         CON2 = CON * CON
@@ -2634,32 +2765,45 @@ class Magnetics():
                     err = errt
                     risultato = a[j, i,...]
             if norm(a[i, i,...] - a[i - 1, i - 1,...]) >= SAFE * err:
-                # print('safe exit', a[i, i], a[i - 1, i - 1])
                 return risultato, err
 
         return risultato, err
 
     #@cron
     ### COPY OF THE NUMBA FUNCTIONS ###
-    def susceptibility_B_ord1(self, fields, temp, basis, LF_matrix, delta=0.1):
-        # returns the derivative of the function at a point x by Ridders' method of polynomial extrapolation. The value h is input as an estimated initial stepsize.
-        # it need not to be small, but rather should be an increment in x over which the function changes substantially. An estimate of the error is also computed.
-        # the stepsize is decreased by CON at each iteeration. Max size of tableau is set by NTAB.
+    def susceptibility_B_ord1(self, fields, temp, basis, LF_matrix, delta=1.):
+        """
+        Computes the magnetic susceptibility tensor as the derivative of the magnetization vector in x,y,z,
+        for a set of field vectors (evenly sampled on a sphere). The values are then averaged among the 
+        different directions of the magnetic field vector, hence it is generally enough to pass a single field vector
+        as e.g. np.array([[0,0,1]]) (fields needs to be bidimensional).
+        The differentiation method is based on Ridders' method of polynomial extrapolation. 
+        The value h is input as an estimated initial stepsize (it has to be larger that the one you would pass to a standard differentiation procedure).
+        An estimate of the error is also computed.
+
+        Parameters:
+        fields (numpy.ndarray): field vectors (shape = N x 3, in T).
+        temp (float): temperature in K.
+        basis (numpy.ndarray): basis of the Hamiltonian matrix.
+        LF_matrix (numpy.ndarray): 0 field Hamiltonian matrix.
+        delta (float, optional): differentiation step in T. Default is 1.
+
+        Returns:
+        chi_tensor (numpy.ndarray): magnetic susceptibility tensor (SI unit).
+        err_tensor (numpy.ndarray): error estimation for the computation of the magnetic susceptibility tensor (SI unit).
+        """
 
         mu0 = 1.25663706212e-06
         muB = 0.4668517532494337
         Jconv = 1.9865e-23
 
-        #print('ord1')
         mu_matrix = mag_moment(basis)  #complex128[:,:,:]
-        # print('from ord1: ', mu_matrix)
         chi = np.zeros((fields.shape[0], 3, 3), dtype='float64')
         err = np.zeros_like(chi)
         if len(fields.shape)<2:
             fields = np.array([fields])
         for i in range(fields.shape[0]):
             for idx in range(3):
-                #print('idx',idx)
                 chi_comp, err_comp = self.dfridr(M_vector, fields[i], delta, idx, chi.shape[1:], fargs=(mu_matrix, LF_matrix, basis, temp))
                 chi[i,idx] = chi_comp * mu0*muB*Jconv
                 err[i,idx] = np.ones(chi_comp.shape)*err_comp * mu0*muB*Jconv
@@ -2668,7 +2812,7 @@ class Magnetics():
         chi_tensor = np.sum(chi, axis=0)/fields.shape[0]
         err_tensor = np.sum(err, axis=0)/fields.shape[0]
 
-        return (chi_tensor, err_tensor)
+        return chi_tensor, err_tensor
 
 
 #########PROJECTIONS###########
