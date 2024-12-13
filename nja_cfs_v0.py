@@ -858,7 +858,7 @@ class Hamiltonian():
         Equations are taken from Konig & Kremer (Ch 2, p 11, eq 2.82)
 
         Parameters:
-        zeat (float): The SOC parameter in cm^{-1}.
+        zeta (float): The SOC parameter in cm^{-1}.
         k (int, optional): The orbital reduction factor. Default is 1.
         evaluation (bool, optional): A flag indicating whether the parameters are symbolic or numerical. Default is True.
 
@@ -1451,6 +1451,8 @@ class calculation():
         eig_opt (bool, optional): A flag indicating whether to optimize the wavefunction. Default is False.
         ground_proj (bool, optional): A flag indicating whether to wavefunctions composition is computed or not. Default is False.
         return_proj (bool, optional): A flag indicating whether to return the wavefunctions composition. Default is False.
+                                      If the calculation is perfomed in the complete basis set or on a reduced one (different from just considering the ground state only with ground_only=True)
+                                      the projection is a list of two dictionaries. The first without, the second with, the MJ label.
         save_label (bool, optional): A flag indicating whether to save the labels of the states. Default is False.
         save_LF (bool, optional): A flag indicating whether to save the Hamiltonian matrix (without the Zeeman contribution). Default is False.
         save_matrix (bool, optional): A flag indicating whether to save the Hamiltonian matrix. Default is False.
@@ -2042,7 +2044,7 @@ def dfridr(func, x, h, idxi, shape, fargs):
         a[0,0,...] = ((func(dx,*fargs)-func(sx,*fargs))/zero)
 
     err = np.inf
-    risultato = None
+    result = None
 
     for i in range(1, NTAB):
         hh /= CON
@@ -2064,12 +2066,12 @@ def dfridr(func, x, h, idxi, shape, fargs):
             errt = max(norm(a[j, i,...] - a[j - 1, i,...]), norm(a[j, i,...] - a[j - 1, i - 1,...]))
             if errt <= err:
                 err = errt
-                risultato = a[j, i,...]
+                result = a[j, i,...]
         if norm(a[i, i,...] - a[i - 1, i - 1,...]) >= SAFE * err:
             # print('safe exit', a[i, i], a[i - 1, i - 1])
-            return risultato, err
+            return result, err
 
-    return risultato, err
+    return result, err
 
 def add_Zeeman(field_vec, basis, LF_matrix):
 
@@ -2700,7 +2702,7 @@ class Magnetics():
         fargs (tuple): additional arguments for the function.
 
         Returns:
-        risultato (numpy.ndarray): result of the differentiation.
+        result (numpy.ndarray): result of the differentiation.
         err (float): error estimation of the differentiation.
         """
 
@@ -2723,7 +2725,7 @@ class Magnetics():
             a[0,0,...] = ((func(dx,*fargs)-func(sx,*fargs))/zero)
 
         err = np.inf
-        risultato = None
+        result = None
 
         for i in range(1, NTAB):
             hh /= CON
@@ -2745,11 +2747,11 @@ class Magnetics():
                 errt = max(norm(a[j, i,...] - a[j - 1, i,...]), norm(a[j, i,...] - a[j - 1, i - 1,...]))
                 if errt <= err:
                     err = errt
-                    risultato = a[j, i,...]
+                    result = a[j, i,...]
             if norm(a[i, i,...] - a[i - 1, i - 1,...]) >= SAFE * err:
-                return risultato, err
+                return result, err
 
-        return risultato, err
+        return result, err
 
     #@cron
     ### COPY OF THE NUMBA FUNCTIONS ###
