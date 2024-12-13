@@ -3638,7 +3638,7 @@ def from_AOM_to_Vint(dic_AOM, conf):
     return dic_V
 
 def from_Aqkrk_to_Bkq(Aqkrk, revers=False):  
-    # conversion from Akq<rk> of stevens to Bkq of wybourne (o Lkq secondo: https://www2.cpfs.mpg.de/~rotter/homepage_mcphase/manual/node130.html)
+    # conversion from Akq<rk> of stevens to Bkq of wybourne (o Lkq according to: https://www2.cpfs.mpg.de/~rotter/homepage_mcphase/manual/node130.html)
 
     dic_bkq = {}
     for key1 in Aqkrk.keys():
@@ -3657,7 +3657,7 @@ def sph_harm(l,m,theta,phi):
     return y
 
 def calc_Bqk(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
-    # calc Stevens coefficients, B^q_k, from data in the hard point charge model
+    # calc Stevens coefficients, B^q_k, from data in the point charge model
 
     if conf[0]=='d':
         l=2
@@ -3677,7 +3677,7 @@ def calc_Aqkrk(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
     #in data is (N. ligands x 5)
     #[labels, x, y, z, charge] if sph_falg==False
     #the calculation is performed in the hard point charge model
-    #equation 9a, 9b, 9c from simpre2
+    #equation 9a, 9b, 9c from Software package SIMPRE - Revisited (M. Karbowiak and C. Rudowicz)
 
     import scipy.special
 
@@ -3772,25 +3772,11 @@ def calc_Bkq(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
 
     return Bkq
 
-def from_Vreal_to_V(dic_V):
-    #ordine -2, -1, 0, 1, 2
-    #prende in input l'ordine di OctoYot: z2, yz, xz, xy, x2-y2
-
-    dic_Vnew = {
-                '11':0.5*(dic_V['55']+dic_V['44']),
-                '21':0.5*(dic_V['53']-1j*dic_V['43']+1j*dic_V['52']+dic_V['42']), '22':0.5*(dic_V['33']+dic_V['22']),
-                '31':(1/np.sqrt(2))*(dic_V['51']-1j*dic_V['41']), '32':(1/np.sqrt(2))*(dic_V['31']-1j*dic_V['21']), '33':dic_V['11'],
-                '41':0.5*(-dic_V['53']+1j*dic_V['43']+1j*dic_V['52']+dic_V['42']), '42':0.5*(-dic_V['33']+2*1j*dic_V['32']+dic_V['22']), '43':(1/np.sqrt(2))*(-dic_V['31']+1j*dic_V['21']), '44':0.5*(dic_V['33']+dic_V['22']),
-                '51':0.5*(dic_V['55']-2*1j*dic_V['54']-dic_V['44']), '52':0.5*(dic_V['53']-1j*dic_V['52']-1j*dic_V['43']-dic_V['42']), '53':(1/np.sqrt(2))*(dic_V['51']-1j*dic_V['41']), '54':0.5*(-dic_V['53']-1j*dic_V['52']+1j*dic_V['43']-dic_V['42']), '55':0.5*(dic_V['55']+dic_V['44'])
-                }
-
-    return dic_Vnew
 
 def rota_LF(l, dic_Bkq, A=0, B=0, C=0):
-    #qui sono implementate le small-d che servono per ruotare i Bkq
-    #gli angoli vengono passati in radianti
+    #rotation of Bkq with Euler angles
+    #the angles must be in radiants
     #convention of D-matrix: Z-Y-Z
-    #per ogni k c'è una diversa matrice D
 
     dic_Bkq_new = {}
 
@@ -3828,8 +3814,7 @@ def rota_LF(l, dic_Bkq, A=0, B=0, C=0):
 
 #@cron
 def rota_LF_quat(l, dic_Bkq, R, dict=None, coeff=None):
-    #qui sono implementate le small-d che servono per ruotare i Bkq con quaternioni
-    #per ogni k c'è una diversa matrice D
+    #rotation of Bkq with quaternions
 
     dic_Bkq_new = {}
 
@@ -3939,7 +3924,7 @@ def read_DWigner_quat():
     return list_dict[0], dic_matrix_coeff
 
 def R_zyz(alpha, beta, gamma):
-    #matrice di rotazione in convenzione zyz (active rotation)
+    #rotation matrix zyz (active rotation)
 
     A = alpha*np.pi/180
     B = beta*np.pi/180
@@ -3957,7 +3942,7 @@ def R_zyz(alpha, beta, gamma):
     return R
 
 def from_matrix_to_result(matrix):
-    w,v = diagonalisation(matrix)  #importante usare eigh
+    w,v = diagonalisation(matrix)  
     result = np.vstack((w,v))
     result = np.copy(result[:, result[0,:].argsort()])
     return result
@@ -4730,7 +4715,7 @@ def terms_labels(conf):
     return legenda[conf]
 
 def terms_basis(conf):
-    #(2S, L, seniority) da OctoYot f_e_data.f90, TS_d_basis (seguono l'ordine di Nielson e Koster)
+    #(2S, L, seniority) da OctoYot f_e_data.f90, TS_d_basis (order from Nielson e Koster)
     if conf[0]=='d' and int(conf[1:])>5:
         conf = 'd'+str(almost_closed_shells(conf))
     elif conf[0]=='f' and int(conf[1:])>7:
@@ -5150,7 +5135,7 @@ def terms_labels_symm(conf):
     return legenda[conf]
 
 def conv_Aqkrk_bkq(l,m):
-    #conversion from stevens coefficients to wybourne formalism
+    #conversion factor Stevens coefficients to Wybourne formalism
 
     if isinstance(l, int):
         l = str(l)
@@ -5665,60 +5650,6 @@ def angle_between_vectors(v1, v2):
     
     return angle_rad, angle_deg
 
-#OTHER (not used)
-
-def projection_LS(basis2, labels, basis1, bin=1e-4, J_label=False):   #!!!!!!!NOT USED (BUT WORKS)
-    # calculates projection of basis2 on basis1 (the free ion case, with only e-e interaction)
-    # expresses it in terms of SL basis or SLJ basis (if J_label = True)
-
-    # print(labels)
-
-    # LS_list = [labels[i][:2] for i in range(len(labels))]
-    # LS = []
-    # [LS.append(LS_list[i]) for i in range(len(LS_list)) if LS_list[i] not in LS]
-
-    matrix_coeff = np.zeros_like(basis1)
-    matrix_coeff_re2 = np.zeros_like(basis1, dtype='float64')
-    states = []
-    states_red = {}
-    for i in range(basis2.shape[0]):
-        states.append([])
-        states_red[i+1] = {}
-        for j in range(basis1.shape[0]):
-            matrix_coeff[j,i] = np.dot(basis1[:,j].T,basis2[:,i])
-            matrix_coeff_re2[j,i] = np.abs(np.dot(np.conj(basis1[:,j]).T,basis2[:,i]))**2
-            for key in labels[j+1].keys():   #dovrebbe essere solo 1
-                stato = [key, matrix_coeff_re2[j,i]]
-            states[i].append(stato)
-            if J_label==True:
-                key, value = stato[0], stato[1]
-            else:
-                key, value = stato[0][:2], stato[1]
-            if value>bin:
-                if key in states_red[i+1].keys():
-                    states_red[i+1][key] += value
-                else:
-                    states_red[i+1][key] = value
-            else:
-                pass
-        tot = sum(states_red[i+1].values())
-        if round(tot,2) != 1:
-            warnings.warn('The expantion coefficient do not sum to 1')
-            print(tot)
-        for key, value in states_red[i+1].items():
-            states_red[i+1][key] = value*100/tot
-        sortato = sorted(states_red[i+1].items(), key=lambda x:x[1], reverse=True)  #sort dict on values
-        states_red[i+1] = dict(sortato)
-        # print(tot)
-        # print(matrix_coeff[:,i])   #combinazione lineare per basis2[:,i]
-        # print(matrix_coeff_re2[:,i])
-        # print(states[i])
-        # print(states_red[i+1])
-    # print(states_red)
-    # print(states_red)
-    # exit()
-    return states_red
-
 #=========================================================================================
 #                                    FROM ON_DEV                                         #
 #=========================================================================================
@@ -6194,3 +6125,56 @@ def Rzyz_active(alpha=0,beta=0,gamma=0):
     
     return R 
 
+#OTHER (not used)
+
+def projection_LS(basis2, labels, basis1, bin=1e-4, J_label=False):   #!!!!!!!NOT USED (BUT WORKS)
+    # calculates projection of basis2 on basis1 (the free ion case, with only e-e interaction)
+    # expresses it in terms of SL basis or SLJ basis (if J_label = True)
+
+    # print(labels)
+
+    # LS_list = [labels[i][:2] for i in range(len(labels))]
+    # LS = []
+    # [LS.append(LS_list[i]) for i in range(len(LS_list)) if LS_list[i] not in LS]
+
+    matrix_coeff = np.zeros_like(basis1)
+    matrix_coeff_re2 = np.zeros_like(basis1, dtype='float64')
+    states = []
+    states_red = {}
+    for i in range(basis2.shape[0]):
+        states.append([])
+        states_red[i+1] = {}
+        for j in range(basis1.shape[0]):
+            matrix_coeff[j,i] = np.dot(basis1[:,j].T,basis2[:,i])
+            matrix_coeff_re2[j,i] = np.abs(np.dot(np.conj(basis1[:,j]).T,basis2[:,i]))**2
+            for key in labels[j+1].keys():   #dovrebbe essere solo 1
+                stato = [key, matrix_coeff_re2[j,i]]
+            states[i].append(stato)
+            if J_label==True:
+                key, value = stato[0], stato[1]
+            else:
+                key, value = stato[0][:2], stato[1]
+            if value>bin:
+                if key in states_red[i+1].keys():
+                    states_red[i+1][key] += value
+                else:
+                    states_red[i+1][key] = value
+            else:
+                pass
+        tot = sum(states_red[i+1].values())
+        if round(tot,2) != 1:
+            warnings.warn('The expantion coefficient do not sum to 1')
+            print(tot)
+        for key, value in states_red[i+1].items():
+            states_red[i+1][key] = value*100/tot
+        sortato = sorted(states_red[i+1].items(), key=lambda x:x[1], reverse=True)  #sort dict on values
+        states_red[i+1] = dict(sortato)
+        # print(tot)
+        # print(matrix_coeff[:,i])   #combinazione lineare per basis2[:,i]
+        # print(matrix_coeff_re2[:,i])
+        # print(states[i])
+        # print(states_red[i+1])
+    # print(states_red)
+    # print(states_red)
+    # exit()
+    return states_red
