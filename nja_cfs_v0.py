@@ -63,6 +63,9 @@ class Wigner_coeff():
     """
     This class is a wrapper around the functions to compute angular momentum coupling coefficients
     and Wigner D matrices for spherical harmonics rotations.
+
+    References:
+    1. Boca, R., "Theoretical Foundations of Molecular Magnetism" (1999)
     """
 
     def fact(number):
@@ -90,7 +93,7 @@ class Wigner_coeff():
             return int(factorial)
 
     def threej_symbol(matrix):
-        # computes racah formula for 3j-symbols (p 52 Ch 1 libro Boca)
+        # computes racah formula for 3j-symbols (p 52 Ch 1 from Boca)
         # ([a , b, c],[A, B, C]) or ([j1, j2, j3],[m1, m2, m3])
         """
         Compute the 3j-symbol using the Racah formula.
@@ -288,9 +291,6 @@ class Wigner_coeff():
 
         A = R[0] -1j*R[3]
         B = -R[2]-1j*R[1]
-        # print(R)
-        # print('A',A)
-        # print('B',B)
 
         if np.abs(A)<bin:
             A = 0
@@ -300,7 +300,6 @@ class Wigner_coeff():
         Z = R[0]**2 - R[1]**2 - R[2]**2 + R[3]**2
         Ac = np.conj(A)
         Bc = np.conj(B)
-        #print('values', Z, Ac, Bc, A, B)
         D = np.zeros((2*l+1, 2*l+1), dtype='complex128')
         if l==2:
             D[4,4] = A**4                           # D[2,2] =
@@ -384,18 +383,14 @@ class Wigner_coeff():
                 idx = [int(ii) for ii in key.split(':')]
                 i = np.abs(idx[0]+l)
                 j = np.abs(idx[1]+l)
-                #print(idx)
                 D[i,j] = eval(value)
                 D[i,j] *= coeff[l][i,j]
 
-                #print(i,j, value, eval(value), coeff[l][i,j])
             D_rep = np.zeros_like(D, dtype='complex128')
             for i,ii in enumerate(range(l,-1,-1)):
                 for j,jj in enumerate(range(l,-l-1,-1)):
-                    D_rep[i,j] = D[i,j] #str(ii)+','+str(jj)# D[i,j]
-                    D_rep[-i-1,-j-1] = (-1)**(np.abs(i-j))*np.conj(D[i,j]) #str(ii)+','+str(jj) #(-1)**(np.abs(i-j))*np.conj(D[i,j])
-            # print('pass',l, D_rep)
-            # exit()
+                    D_rep[i,j] = D[i,j] 
+                    D_rep[-i-1,-j-1] = (-1)**(np.abs(i-j))*np.conj(D[i,j]) 
             D=D_rep
 
         return D
@@ -496,16 +491,16 @@ class CFP():
 
 
 class RME():  #RME(CFP)
-    #from E. Konig & S. Kremer "Ligand Field Energy Diagrams" (eq 2.85,2.87)
-    #or from Boca, "theoretical fundations of molecular magnetism" (Ch 8, p 516)
+    #from E. Konig "Ligand Field Energy Diagrams" (eq 2.85,2.87)
+    #or from Boca, "theoretical foundations of molecular magnetism" (Ch 8, p 516)
     """
     This class is used to perform a RME calculation for a given electron configuration. 
     The electron configuration is represented by a string of the form 'l^x', where 'l' is the azimuthal quantum number 
     (represented as 'd' for l=2 and 'f' for l=3), and 'x' is the number of electrons in the configuration.
 
     References:
-    1. E. Konig & S. Kremer "Ligand Field Energy Diagrams" (eq 2.85,2.87)
-    2. R. Boca, "theoretical fundations of molecular magnetism" (Ch 8, p 516)
+    1. E. Konig "Ligand Field Energy Diagrams" (eq 2.85,2.87)
+    2. R. Boca, "theoretical foundations of molecular magnetism" (Ch 8, p 516)
 
     Attributes:
     v, L, S, v1, L1, S1 (float): The quantum numbers for the state.
@@ -654,8 +649,8 @@ class Hamiltonian():
 
     References:
     1. R. Boca, "A handbook of magnetochemical formulae". Elsevier, 2012.
-    2. R. Boca, "theoretical fundations of molecular magnetism" 1999. 
-    3. E. Konig & S. Kremer "Ligand Field Energy Diagrams" 1983.
+    2. R. Boca, "theoretical foundations of molecular magnetism" 1999. 
+    3. E. Konig "Ligand Field Energy Diagrams" 2013.
     4. C. Goerller-Walrand, K. Binnemans, Handbook of Physics & Chemistry of Rare Earths, Vol 23, Ch 155, 1996.
 
     Attributes:
@@ -746,7 +741,7 @@ class Hamiltonian():
     def electrostatic_int(self, basis, F0=0, F2=0, F4=0, F6=0, evaluation=True, tab_ee=None):
         """
         Computes electron repulsion integrals <self.label1|Hee|self.label2> for the given basis set.
-        Equations are taken from Boca 1999, "theoretical fundations of molecular magnetism" (Ch 8, p 518) (valid only for l2 conf)
+        Equations are taken from Boca 1999, "theoretical foundations of molecular magnetism" (Ch 8, p 518) (valid only for l2 conf)
         For the d^n configurations the equations are reported in Boca2012 (p 145 eq 4.66-4.69)
 
         Parameters:
@@ -2318,7 +2313,7 @@ class Magnetics():
     Class for magnetic properties calculations.
 
     References:
-    1. R. Boca, "theoretical fundations of molecular magnetism" 1999.
+    1. R. Boca, "theoretical foundations of molecular magnetism" 1999.
 
     Attributes:
     result (np.array): eigenvalue and eigenvectors of the Hamiltonian matrix.
@@ -4645,7 +4640,7 @@ def from_sph_to_car(coord_sph):
     return coord_car
 
 def terms_labels(conf):
-    #from Boca, "theoretical fundations of molecular magnetism" (Ch 8, p 381, Tab 8.4)
+    #from Boca, "theoretical foundations of molecular magnetism" (Ch 8, p 381, Tab 8.4)
     #or OctoYot f_e_data.f90, TS_d_labels (following the order of Nielson e Koster)
 
     if conf[0]=='d' and int(conf[1:])>5:
