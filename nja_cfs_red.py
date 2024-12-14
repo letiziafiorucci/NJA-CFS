@@ -243,7 +243,7 @@ class Wigner_coeff():
         The Wigner D-matrix is defined in terms of Euler angles.
 
         Parameters:
-        l (int): The total angular momentum quantum number.
+        l (int): The one-electron orbital quantum number.
         m1 (int): The initial magnetic quantum number.
         m (int): The final magnetic quantum number.
         alpha (float): The first Euler angle, in radians.
@@ -275,7 +275,7 @@ class Wigner_coeff():
         The quaternion in input does not need to be normalized since it is normalized before the calculation.
 
         Parameters:
-        l (int): The orbital angular momentum quantum number.
+        l (int): The one-electron orbital quantum number.
         R (numpy.ndarray): The quaternion representing the rotation.
         bin (float, optional): The tolerance size for the calculation. Default is 1e-8.
         dict (dict, optional): dictionary from tables. Default is None.
@@ -410,7 +410,7 @@ class CFP():
 
     Attributes:
     dic_LS_inv_almost (dict): An inverse dictionary for the LS-coupling scheme for the almost-closed-shell configuration.
-    l (int): The azimuthal quantum number.
+    l (int): The one-electron orbital quantum number.
     n (int): The number of electrons in the almost-closed-shell configuration.
     N (int): The number of electrons in the configuration.
     closed (bool): A flag indicating whether the configuration is almost-closed-shell or not.
@@ -513,7 +513,7 @@ class RME():  #RME(CFP)
     dic_LS (dict): A dictionary for the LS-coupling scheme.
     dic_LS_inv_almost (dict): An inverse dictionary for the LS-coupling scheme for the almost-closed-shell configuration.
     s (float): The spin quantum number.
-    l (int): The azimuthal quantum number.
+    l (int): The one-electron orbital quantum number.
     n (int): The number of electrons in the almost-closed-shell configuration.
     N (int): The number of electrons in the configuration.
     cfp (CFP): A CFP object for the configuration.
@@ -664,7 +664,7 @@ class Hamiltonian():
     dic_LS (dict): A dictionary for the LS-coupling scheme.
     dic_LS_inv_almost (dict): An inverse dictionary for the LS-coupling scheme for the almost-closed-shell configuration.
     s (float): The spin quantum number.
-    l (int): The azimuthal quantum number.
+    l (int): The one-electron orbital quantum number.
     n (int): The number of electrons in the almost-closed-shell configuration.
     N (int): The number of electrons in the configuration.
     cfp (CFP): A CFP object for the configuration.
@@ -996,7 +996,7 @@ def Full_basis(conf):
     """
     Produces the complete basis set for a given configuration, saved in different format:
     1. basis --> array: n. microstates x [2S, L, 2J, 2M, sen (,count)] 
-    2. dic_LS --> dict: '[2S, L, 2J, 2M, sen (,count)]': label as N. and K.
+    2. dic_LS --> dict: '2S:L:2J:2M:sen:count': label as N. and K.
     3. basis_l --> list: 2S+1 L (J)
     4. basis_l_JM --> list: 2S+1 L (J) MJ
 
@@ -1035,53 +1035,18 @@ def Full_basis(conf):
         TwoS = term_base[0]
         L = term_base[1]
         sen = term_base[2]
+        label_l = terms_labels(conf)[st]
 
-        if n_el==1:
-            sen_str=''
+        if len(label_l)>2:
+            sen_str = label_l[-1]
         else:
-            if st!=n_freeion_SL[n_el-1]-1 and st!=0:
-                termm1 = terms_basis(conf)[st-1]
-                termp1 = terms_basis(conf)[st+1]
-                if sen!=n_el and termp1[0]==term_base[0] and termp1[1]==term_base[1] and (termm1[0]!=term_base[0] or termm1[1]!=term_base[1]):  #forse si può ridurre
-                    count=1
-                    sen_str=str(count)
-                elif sen!=n_el and (termp1[0]!=term_base[0] or termp1[1]!=term_base[1]) and (termm1[0]!=term_base[0] or termm1[1]!=term_base[1]):
-                    sen_str=''
-                    count=0
-                elif sen!=n_el and termm1[0]==term_base[0] and termm1[1]==term_base[1]:
-                    count+=1
-                    sen_str=str(count)
-                elif sen==n_el and termm1[0]==term_base[0] and termm1[1]==term_base[1]:
-                    count+=1
-                    sen_str=str(count)
-                elif sen==n_el and (termp1[0]==term_base[0] and termp1[1]==term_base[1]) and (termm1[0]!=term_base[0] or termm1[1]!=term_base[1]):
-                    count=1
-                    sen_str=str(count)
-                elif sen==n_el and (termp1[0]==term_base[0] or termp1[1]==term_base[1]):
-                    sen_str=''
-                    count=0
-            else:
-                if st==0:
-                    termp1 = terms_basis(conf)[st+1]
-                    if (sen==n_el or sen!=n_el) and (termp1[0]!=term_base[0] or termp1[1]!=term_base[1]):
-                        sen_str=''
-                        count=0
-                    else:
-                        count+=1
-                        sen_str=str(count)
-                else:
-                    termm1 = terms_basis(conf)[st-1]
-                    if (sen==n_el or sen!=n_el) and (termm1[0]!=term_base[0] or termm1[1]!=term_base[1]):
-                        sen_str=''
-                        count=0
-                    else:
-                        count+=1
-                        sen_str=str(count)
+            sen_str = ''
         if sen_str=='10':
             sen_str = '0'
-        name_LS = str(TwoS+1)+state_legend(str(L), inv=True)+sen_str
+
         J1 = np.abs(2*L-TwoS)
         J2 = 2*L + TwoS
+
         for TwoJ in range(J1,J2+2,2):
             if TwoJ%2==0:
                 J_str = str(int(TwoJ/2))
@@ -1089,11 +1054,18 @@ def Full_basis(conf):
                 J_str = str(int(TwoJ))+'/2'
             for TwoMJ in range(-TwoJ,TwoJ+2,2):
                 if conf[0]=='f':
+                    if sen_str=='':
+                        count = 0
+                    else:
+                        if sen_str=='0':
+                            count = 10
+                        else:
+                            count = int(sen_str)
                     lista = [TwoS, L, TwoJ, TwoMJ, sen, count]
                 else:
                     lista = [TwoS, L, TwoJ, TwoMJ, sen]
                 basis.append(lista)
-                dic_LS[':'.join(f'{n}' for n in lista)] = name_LS
+                dic_LS[':'.join(f'{n}' for n in lista)] = label_l
                 if TwoMJ%2==0:
                     MJ_str = str(int(TwoMJ/2))
                 else:
@@ -1128,7 +1100,7 @@ class calculation():
 
     Attributes:
     conf (str): The electron configuration.
-    l (int): The azimuthal quantum number.
+    l (int): The one-electron orbital quantum number.
     n (int): The number of electrons in the almost-closed-shell configuration.
     N (int): The number of electrons in the configuration.
     closed (bool): A flag indicating whether the configuration is almost-closed-shell or not.
@@ -1206,7 +1178,7 @@ class calculation():
 
     def ground_state_calc(self, ground=None):
         #basis --> array: n. microstates x [2S, L, 2J, 2M, sen (,count)]
-        #dic_LS --> dict: '[2S, L, 2J, 2M, sen (,count)]': label as N. and K.
+        #dic_LS --> dict: '2S:L:2J:2M:sen:count': label as N. and K.
         #basis_l --> list: 2S+1 L (J)
         #basis_l_JM --> list: 2S+1 L (J) MJ
         """
@@ -1299,7 +1271,7 @@ class calculation():
         # default parameters are taken from Ma, C. G., Brik, M. G., Li, Q. X., & Tian, Y. (2014) Journal of alloys and compounds, 599, 93-101.
 
         # basis --> array: n. microstates x [2S, L, 2J, 2M, sen (,count)]
-        # dic_LS --> dict: '[2S, L, 2J, 2M, sen (,count)]': label as N. and K.
+        # dic_LS --> dict: '2S:L:2J:2M:sen:count': label as N. and K.
         # basis_l --> list: 2S+1 L (J)
         # basis_l_JM --> list: 2S+1 L (J) MJ
         """
