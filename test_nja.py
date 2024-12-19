@@ -1590,6 +1590,53 @@ def Susceptibility_Tdep():
     plt.legend()
     plt.savefig('dydota_tempdep.png', dpi=600)
 
+def conversion_Stev_Wyb():
+    #CFPs from  https://doi.org/10.1002/ange.201706931
+    #compare the plot with figure 2 in the paper
+
+    list_files = ['Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb']
+    conf_list = ['f8','f9','f10','f11','f12','f13']
+
+    energy_matrix = []
+    for i in range(len(list_files)):
+        cfp_list = np.loadtxt('test/CFP_kuprov_'+list_files[i]+'DOTA.txt')
+        dic_Aqkrk = {}
+        count = 0
+        for k in range(2,7,2):
+            dic_Aqkrk[f'{k}'] = {}
+            for q in range(-k,k+1):
+                dic_Aqkrk[f'{k}'][f'{q}'] = cfp_list[count]/nja.Stev_coeff(str(k), conf_list[i])
+                count += 1
+
+        dic_Bkq = nja.from_Aqkrk_to_Bkq(dic_Aqkrk)
+
+        for k in range(2,7,2):
+            for q in range(-k,k+1):
+                print(f'{k} {q} {dic_Bkq[f"{k}"][f"{q}"]:.4e}')
+
+        dic = {'dic_bkq':dic_Bkq}
+
+        calc = nja.calculation(conf_list[i], ground_only=True, TAB=True)
+        result = calc.MatrixH(['Hcf'], **dic, eig_opt=False)
+        E = result[0,:]-np.min(result[0,:])
+        energy_matrix.append(E)
+
+    #plot energy levels
+    
+    # Plotting
+    plt.figure(figsize=(6, 4.5))
+    for i, energy_levels in enumerate(energy_matrix):
+        x_pos = i  # Position on the x-axis
+        for energy in energy_levels:
+            plt.hlines(y=energy, xmin=x_pos - 0.2, xmax=x_pos + 0.2, color='blue', linewidth=2)
+
+    plt.ylabel(r'Energy (cm$^{-1}$)')
+    plt.ylim(-20, 700)
+    plt.xticks(range(len(list_files)), list_files)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    plt.savefig('kuprov_LnDOTA_Wyb.png', dpi=600)
+    plt.show()
+
 #===================================================================================================
 ### MAIN
 
@@ -1630,6 +1677,7 @@ if __name__ == '__main__':
     # eigenfunction_optimization_opt()
     # comparison_exp_chi()
     # Susceptibility_Tdep()
+    # conversion_Stev_Wyb()
 
     
     

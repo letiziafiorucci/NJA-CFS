@@ -2390,7 +2390,7 @@ class Magnetics():
 
                     kL, gS = H.Zeeman(k=k, evaluation=evaluation, MM=True)
 
-                    # x,y,z  -->  -1,0,+1
+                    # from -1,0,+1 to x,y,z
                     matrix[0,i,j] += (kL[0]+gS[0] - (kL[2]+gS[2]))*1/(np.sqrt(2))
                     matrix[1,i,j] += (kL[0]+gS[0] + kL[2]+gS[2])*1j/(np.sqrt(2))
                     matrix[2,i,j] += kL[1]+gS[1]
@@ -2405,6 +2405,58 @@ class Magnetics():
             matrix = np.round(matrix, 16)
 
         return matrix
+
+    def calc_LS(self, k=1):
+        #costruction of Lx,y,z and Sx,y,z operators
+        """
+        Computes the magnetic moment matrix.
+
+        Parameters:
+        k (int, optional): orbital reduction factor.
+
+        Returns:
+        L (numpy.ndarray): the orbital angular momentum matrix [x,y,z] (multiplied by k).
+        S (numpy.ndarray): the spin angular momentum matrix [x,y,z] (multiplied by ge).
+        """
+
+        L = np.zeros((3, self.basis.shape[0],self.basis.shape[0]),dtype='complex128')
+        S = np.zeros((3, self.basis.shape[0],self.basis.shape[0]),dtype='complex128')
+        for i in range(self.basis.shape[0]):
+            statei = self.basis[i]
+            Si = statei[0]/2.
+            Li = statei[1]
+            Ji = statei[2]/2.
+            MJi = statei[3]/2.
+            seni = statei[4]
+            labeli = self.calc.dic_LS[':'.join([f'{qq}' for qq in statei])]
+            for j in range(0,i+1):
+                statej = self.basis[j]
+                Sj = statej[0]/2.
+                Lj = statej[1]
+                Jj = statej[2]/2.
+                MJj = statej[3]/2.
+                senj = statej[4]
+                labelj = self.calc.dic_LS[':'.join([f'{qq}' for qq in statej])]
+                H = Hamiltonian([seni,Li,Si,senj,Lj,Sj,Ji,MJi,Jj,MJj], [labeli,labelj], self.calc.conf, self.calc.dic_cfp, self.calc.tables, self.calc.dic_LS, self.calc.dic_LS_almost)  #self.conf è quella del main
+                if Li==Lj and Si==Sj and seni==senj:
+
+                    kL, gS = H.Zeeman(k=k, evaluation=True, MM=True)
+
+                    # from -1,0,+1 to x,y,z
+                    L[0,i,j] += (kL[0] - kL[2])*1/(np.sqrt(2))
+                    L[1,i,j] += (kL[0] + kL[2])*1j/(np.sqrt(2))
+                    L[2,i,j] += kL[1]
+
+                    S[0,i,j] += (gS[0] - gS[2])*1/(np.sqrt(2))
+                    S[1,i,j] += (gS[0] + gS[2])*1j/(np.sqrt(2))
+                    S[2,i,j] += gS[1]
+
+                    if i!=j:
+                        for kk in range(3):
+                            L[kk,j,i] += np.conj(L[kk,i,j])
+                            S[kk,j,i] += np.conj(S[kk,i,j])
+
+        return L, S
 
     #@staticmethod
     def effGval(self, levels, v_matrix=None):
