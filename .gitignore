@@ -4,6 +4,8 @@
 !test/example_simpre.inp
 !test/matrix_label_f9complete.txt
 !test
+!test/*.out
+!test/*.txt
 !docs
 !nja_cfs_v0.py
 !nja_cfs_red.py
