@@ -881,7 +881,8 @@ class Hamiltonian():
     def LF_contribution(self, dic_kq, evaluation=True):
         """
         Computes the LF/CF contribution to the Hamiltonian matrix element <self.label1|HCF/LF|self.label2> using Bkq in Wybourne formalism.
-        Equations are taken from C. Goerller-Walrand, K. Binnemans, Handbook of Physics & Chemistry of Rare Earths, Vol 23, Ch 155, (1996).
+        Equations are taken from C. Goerller-Walrand, K. Binnemans, Handbook of Physics & Chemistry of Rare Earths, Vol 23, Ch 155, (1996)
+        or eq 3 of Rudowicz and Karbowiak Coordination chemistry reviews 287 (2015) 28-63.
 
         Parameters:
         dic_kq (dict): A dictionary containing the Bkq coefficients in cm^{-1}, e.g. dic_bkq = {'2':{'-1':0.0}} where k=2 and q=-1. 
@@ -2268,7 +2269,7 @@ def susceptibility_field(fields, temp, basis, LF_matrix, delta=0.001):
 
             num += np.real(mu[i,ii,0]*np.exp(-E[ii]/(kB/1.9865e-23*temp)))
             den += np.real(np.exp(-E[ii]/(kB/1.9865e-23*temp)))
-        E_av = num/den
+        E_av = num/den/3
 
         B_inc = fields[i]/np.linalg.norm(fields[i])*delta
         matrix = add_Zeeman(fields[i]+B_inc, basis, LF_matrix)
@@ -2283,7 +2284,7 @@ def susceptibility_field(fields, temp, basis, LF_matrix, delta=0.001):
 
             num += np.real(mu[i,ii,1]*np.exp(-E[ii]/(kB/1.9865e-23*temp)))
             den += np.real(np.exp(-E[ii]/(kB/1.9865e-23*temp)))
-        E_av_inc = num/den
+        E_av_inc = num/den/3
 
         B_inc = fields[i]/np.linalg.norm(fields[i])*delta
         matrix = add_Zeeman(fields[i]-B_inc, basis, LF_matrix)
@@ -2299,7 +2300,7 @@ def susceptibility_field(fields, temp, basis, LF_matrix, delta=0.001):
 
             num += np.real(mu[i,ii,2]*np.exp(-E[ii]/(kB/1.9865e-23*temp)))
             den += np.real(np.exp(-E[ii]/(kB/1.9865e-23*temp)))
-        E_av_incm = num/den
+        E_av_incm = num/den/3
 
         M_list[i] = E_av*muB*1.9865e-23
         susc_list[i] = (E_av_inc - E_av_incm)/(2*delta)*mu0*muB*1.9865e-23
@@ -2565,7 +2566,7 @@ class Magnetics():
 
                 num += np.real(mu[i,ii,0]*np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
                 den += np.real(np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
-            E_av = num/den
+            E_av = num/den/3
 
             B_inc = fields[i]/np.linalg.norm(fields[i])*delta
             par['field'] = fields[i]+B_inc
@@ -2584,7 +2585,7 @@ class Magnetics():
 
                 num += np.real(mu[i,ii,1]*np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
                 den += np.real(np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
-            E_av_inc = num/den
+            E_av_inc = num/den/3
 
             B_inc = fields[i]/np.linalg.norm(fields[i])*delta
             par['field'] = fields[i]-B_inc
@@ -2603,7 +2604,7 @@ class Magnetics():
 
                 num += np.real(mu[i,ii,2]*np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
                 den += np.real(np.exp(-E[ii]/(self.kB/1.9865e-23*temp)))
-            E_av_incm = num/den
+            E_av_incm = num/den/3
 
             M_list[i] = E_av*self.muB*1.9865e-23
             susc_list[i] = (E_av_inc - E_av_incm)/(2*delta)*self.mu0*self.muB*1.9865e-23
@@ -3487,7 +3488,7 @@ def from_Vint_to_Bkq_2(l, dic_, reverse=False):
                 dic_conv[str(k)][str(q)] /= np.sqrt((2*k+1)/(4*np.pi))*(-1)**q
                 V.append(dic_conv[str(k)][str(q)])
                 if q!=0:
-                    dic_conv[str(k)][str(-q)] /= -np.sqrt((2*k+1)/(4*np.pi))*(-1)**q
+                    dic_conv[str(k)][str(-q)] /= np.sqrt((2*k+1)/(4*np.pi))*(-1)**(q+1)
                     V.append(dic_conv[str(k)][str(-q)])
     else:
         V = [dic_conv[key] for key in dic_conv.keys()]
@@ -3554,10 +3555,10 @@ def from_Vint_to_Bkq_2(l, dic_, reverse=False):
         for k in range(0,2*l+1,2):
             dic_Bkq[str(k)] = {}
             for q in range(0,k+1):
-                dic_Bkq[str(k)][str(q)] = np.sqrt((2*k+1)/(4*np.pi))*(-1)**q*B[count]
+                dic_Bkq[str(k)][str(q)] = np.sqrt((2*k+1)/(4*np.pi))*(-1)**q*B[count]    # to match the "reverse" phase convention ([+q] + (-1)**q [-q])  ...
                 count += 1
                 if q!=0:
-                    dic_Bkq[str(k)][str(-q)] = -np.sqrt((2*k+1)/(4*np.pi))*(-1)**q*B[count]
+                    dic_Bkq[str(k)][str(-q)] = np.sqrt((2*k+1)/(4*np.pi))*(-1)**(q+1)*B[count]    # to match the "reverse" phase convention ([+q] + (-1)**q [-q])  ...
                     count += 1 
 
         return dic_Bkq
@@ -5163,6 +5164,7 @@ def terms_labels_symm(conf):
 
 def conv_Aqkrk_bkq(l,m):
     #conversion factor Stevens coefficients to Wybourne formalism
+    #The following constants are taken from Table 1 in Journal of Computational Chemistry 2014, 35, 1935–1941
 
     if isinstance(l, int):
         l = str(l)
