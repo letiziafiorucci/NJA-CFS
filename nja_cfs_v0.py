@@ -1746,7 +1746,7 @@ class calculation():
             a = angles[0]
             b = angles[1]
 
-            r = scipy.spatial.transform.Rotation.from_euler('ZYZ', [0,b,a], degrees=True)
+            r = scipy.spatial.transform.Rotation.from_euler('ZYZ', [a,b,0], degrees=True)
             R = r.as_quat()
             quat = [R[-1], R[0], R[1], R[2]]
 
@@ -1768,7 +1768,7 @@ class calculation():
         angles = rep_cryst[min_index,:]
         a = angles[0]
         b = angles[1]
-        r = scipy.spatial.transform.Rotation.from_euler('ZYZ', [0,b,a], degrees=True)
+        r = scipy.spatial.transform.Rotation.from_euler('ZYZ', [a,b,0], degrees=True)
         R = r.as_quat()
         quat = [R[-1], R[0], R[1], R[2]]
         dic_rot = rota_LF_quat(calc.l, dic_Bkq, quat, dict, coeff)
