@@ -1,0 +1,17 @@
+cff-version: 1.0.0
+message: "If you use this software, please cite the following paper:"
+title: "Not Just Another Crystal Field Software"
+authors:
+  - family-names: Fiorucci
+    given-names: Letizia
+  - family-names: Ravera
+    given-names: Enrico
+date-released: 2025-03-03
+doi: 10.1002/jcc.70063
+url: https://doi.org/10.1002/jcc.70063
+type: article
+journal: Journal of Computational Chemistry
+volume: 46
+issue: 6
+pages: e70063
+publisher: Wiley Online Library
