@@ -21,5 +21,4 @@ More examples of applications can be found at:
 *Journal of Computational Chemistry*, 2025, Vol. 46, No. 6, e70063  
 [https://doi.org/10.1002/jcc.70063](https://doi.org/10.1002/jcc.70063)
 
-Please cite us! Thanks :)
 
