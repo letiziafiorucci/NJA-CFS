@@ -2963,20 +2963,30 @@ def the_highest_L(proj, conf):
 
 #######FIGURES###########
 
-def plot_energy_levels(eigenvalues, ax=None, color='b', label=None, tolerance=0.05, offset=0, delta=0):
+def plot_energy_levels(eigenvalues, ax=None, color='b', label=None, tolerance=0.05, offset=0, delta=0, ylabel=None):
     """
-    Plot crystal field energy levels from a splitting matrix with a horizontal offset.
-    
+    Plot energy levels (e.g., crystal field levels), optionally labeling them on the x-axis.
+
     Parameters:
-    - splitting_matrix: 2D numpy array, the crystal field splitting matrix to analyze.
-    - ax: matplotlib axis, optional. If provided, plots on this axis.
-    - color: str, color of the levels (e.g., 'b' for blue).
-    - label: str, optional label to identify different crystal fields.
-    - tolerance: float, maximum difference to group levels as degenerate.
-    - offset: float, horizontal offset to place the energy levels of this crystal field.
+    - eigenvalues: list or array of energy levels to plot.
+    - ax: matplotlib Axes object. If None, a new figure and axis will be created.
+    - color: color used to draw energy levels.
+    - label: label to associate with this set of energy levels, shown on the x-axis at the given offset.
+    - tolerance: max difference to consider levels as degenerate.
+    - offset: x-position to plot this set of energy levels.
+    - delta: extra shift applied to horizontal line positions (for fine adjustment).
+    - ylabel: optional label for the y-axis.
     """
-    
-    # Sort and group nearly degenerate energy levels
+
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    # Initialize storage for custom ticks if not present
+    if not hasattr(ax, "_custom_xticks"):
+        ax._custom_xticks = []
+        ax._custom_xticklabels = []
+
+    # Group nearly degenerate levels
     unique_levels = []
     grouped_levels = []
 
@@ -2986,36 +2996,35 @@ def plot_energy_levels(eigenvalues, ax=None, color='b', label=None, tolerance=0.
             grouped_levels.append([ev])
         else:
             grouped_levels[-1].append(ev)
-    
-    # Create the plot if no axis was provided
-    if ax is None:
-        fig, ax = plt.subplots()
-    
-    # Set up offsets for degenerate states
-    x_offset = 0.15  # Small offset within a group of degenerate levels
 
-    # Plot each level with offsets for degenerate states, shifted by the main offset
+    x_offset = 0.15
+
     for level_group in grouped_levels:
-        energy = level_group[0]  # Common energy level for the degenerate group
-        n_deg = len(level_group)  # Number of degenerate states
-        x_positions = np.linspace(-x_offset * (n_deg - 1) / 2, x_offset * (n_deg - 1) / 2, n_deg) + offset
-
-        # Plot each degenerate level with the specified color
+        energy = level_group[0]
+        n_deg = len(level_group)
+        x_positions = np.linspace(-x_offset * (n_deg - 1) / 2,
+                                  x_offset * (n_deg - 1) / 2, n_deg) + offset
         for x in x_positions:
-            ax.hlines(y=energy, xmin=x - 0.05 +delta, xmax=x + 0.05+delta, color=color, linewidth=2)
+            ax.hlines(y=energy, xmin=x - 0.05 + delta, xmax=x + 0.05 + delta,
+                      color=color, linewidth=2)
 
-    # Add label if provided
-    if label:
-        ax.text(offset + 0.22+delta, max(unique_levels) + 0.2, label, ha='center', color=color)
+    # Add custom label
+    if label and offset not in ax._custom_xticks:
+        ax._custom_xticks.append(offset)
+        ax._custom_xticklabels.append(label)
 
-    # Update plot appearance
-    ax.set_ylabel("Energy Levels")
+    # Apply the full list of custom ticks and labels
+    ax.set_xticks(ax._custom_xticks)
+    ax.set_xticklabels(ax._custom_xticklabels)
+    ax.tick_params(axis='x', which='both', bottom=False, top=False)
+
+    ax.get_xaxis().set_visible(True)
+    if ylabel:
+        ax.set_ylabel(ylabel)
     ax.grid(axis='y', linestyle='--', alpha=0.5)
 
-    
-    ax.get_xaxis().set_visible(False)
+    return ax
 
-    return ax  # Return axis to allow further modifications
 
 def fig_tensor_rep_1(tensor, n_points=40):
 
