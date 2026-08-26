@@ -14,6 +14,12 @@ import copy
 import warnings
 #import sympy   #activate this to use evaluation False in functions 
 import crystdat
+from importlib.metadata import version
+if version('scipy') >= '1.17':
+    sph_harm = sph_harm_y
+else:
+    sph_harm = scipy.special.sph_harm
+
 
 __version__ = "1.1.0"
 
@@ -3688,10 +3694,11 @@ def from_Aqkrk_to_Bkq(Aqkrk, revers=False):
 
     return dic_bkq
 
-def sph_harm(l,m,theta,phi):
-    yL = scipy.special.lpmn(m, l, np.cos(theta))[0][-1][-1]
-    y = np.sqrt(fact(l-m)/fact(l+m))*yL*np.exp(1j*m*phi)
-    return y
+def sph_harm_17(q,k,phi,theta):
+    """
+    wrapper for sph_harm_y from scipy 1.17 on
+    """
+    return scipy.special.sph_harm_y(k,q,theta,phi)
 
 def calc_Bqk(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
     # calc Stevens coefficients, B^q_k, from data in the point charge model
@@ -3716,7 +3723,7 @@ def calc_Aqkrk(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
     #the calculation is performed in the hard point charge model
     #equation 9a, 9b, 9c from Software package SIMPRE - Revisited (M. Karbowiak and C. Rudowicz)
 
-    import scipy.special
+    #import scipy.special
 
     au_conv = [scipy.constants.physical_constants['hartree-inverse meter relationship'][0]*1e-2, 1.889725989] #convertion from atomic unit
 
@@ -3740,11 +3747,11 @@ def calc_Aqkrk(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
             pref = plm(k,np.abs(q))*(4*np.pi/(2*k+1))
             somma = 0
             for i in range(data.shape[0]):
-                sphharmp = scipy.special.sph_harm(np.abs(q), k, coord_sph[i,2],coord_sph[i,1])  #sph_harm(k,q,coord_sph[i,1], coord_sph[i,2])/np.sqrt(4*np.pi/(2*k+1))
-                sphharmm = scipy.special.sph_harm(-np.abs(q), k, coord_sph[i,2],coord_sph[i,1])  #sph_harm(k,-q,coord_sph[i,1], coord_sph[i,2])/np.sqrt(4*np.pi/(2*k+1))
+                sphharmp = sph_harm(np.abs(q), k, coord_sph[i,2],coord_sph[i,1])  #sph_harm(k,q,coord_sph[i,1], coord_sph[i,2])/np.sqrt(4*np.pi/(2*k+1))
+                sphharmm = sph_harm(-np.abs(q), k, coord_sph[i,2],coord_sph[i,1])  #sph_harm(k,-q,coord_sph[i,1], coord_sph[i,2])/np.sqrt(4*np.pi/(2*k+1))
                 r = coord_sph[i,0]*au_conv[1]
                 if q==0:
-                    somma += pref*(data[i,-1]*au_conv[0]/r**(k+1))*scipy.special.sph_harm(0, k, coord_sph[i,2],coord_sph[i,1]).real
+                    somma += pref*(data[i,-1]*au_conv[0]/r**(k+1))*sph_harm(0, k, coord_sph[i,2],coord_sph[i,1]).real
                 elif q>0:
                     somma += pref*(data[i,-1]*au_conv[0]/r**(k+1))*(1/np.sqrt(2))*(sphharmm + (-1)**q*sphharmp).real
                 elif q<0:
@@ -3764,7 +3771,7 @@ def calc_Aqkrk(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
 def calc_Bkq(data, conf, sph_flag = False, sth_param = False, bin=1e-9):  
     #eq 11a-11b-11c-12 from Software package SIMPRE - Revisited (M. Karbowiak and C. Rudowicz)
 
-    import scipy.special
+    #import scipy.special
 
     au_conv = [scipy.constants.physical_constants['hartree-inverse meter relationship'][0]*1e-2, 1.889725989] #convertion from atomic unit
 
@@ -3789,7 +3796,7 @@ def calc_Bkq(data, conf, sph_flag = False, sth_param = False, bin=1e-9):
             somma = 0
             for i in range(data.shape[0]):
                 r = coord_sph[i,0]*au_conv[1]
-                sphharm = scipy.special.sph_harm(q, k, coord_sph[i,2],coord_sph[i,1])
+                sphharm = sph_harm(q, k, coord_sph[i,2],coord_sph[i,1])
                 if q==0:
                     somma += prefac*(data[i,-1]*au_conv[0]/r**(k+1))*sphharm.real
                 else:
@@ -4009,7 +4016,7 @@ def Freeion_charge_dist(theta, phi, A2, A4, A6, r=1, bin=1e-10):
     c4 = A4/np.sqrt(4*np.pi/(2*4+1))
     c6 = A6/np.sqrt(4*np.pi/(2*6+1))
 
-    val = 3/(4*np.pi) + c2*scipy.special.sph_harm(0,2,phi,theta).real + c4*scipy.special.sph_harm(0,4,phi,theta).real + c6*scipy.special.sph_harm(0,6,phi,theta).real
+    val = 3/(4*np.pi) + c2*sph_harm(0,2,phi,theta).real + c4*sph_harm(0,4,phi,theta).real + c6*sph_harm(0,6,phi,theta).real
     if np.abs(val)<bin:
         val=0
     return (val)**(1/3)
