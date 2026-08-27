@@ -13,9 +13,12 @@ from pprint import pprint
 import copy
 import warnings
 #import sympy   #activate this to use evaluation False in functions 
-from . import crystdat
 from pathlib import Path
 PACKAGE_DIR = Path(__file__).resolve().parent
+import sys
+sys.path.insert(0, str(PACKAGE_DIR))
+
+import crystdat
 
 from importlib.metadata import version
 if version('scipy') >= '1.17':
@@ -3910,7 +3913,7 @@ def read_DWigner_quat():
                 matrix[i,:] = matrix[i-1,:]*np.sqrt(k*(k+1)-(ii+1)*((ii+1)-1))
         return matrix
 
-    filename = [str(PACKAGE_DIR / 'tables' / 'tab_wignerDquat.txt'), str(PACKAGE_DIR / 'tables' / 'tab_wignerDquat_coeff_t.txt']
+    filename = [str(PACKAGE_DIR / 'tables' / 'tab_wignerDquat.txt'), str(PACKAGE_DIR / 'tables' / 'tab_wignerDquat_coeff_t.txt')]
     list_dict = []
     for ii in range(len(filename)):
         file = open(filename[ii]).readlines()
@@ -4100,7 +4103,7 @@ def cfp_from_file(conf):
 
 def read_matrix_from_file(conf_print, closed_shell=False):
 
-    file = open(PACKAGE_DIR / 'tables' / Path('tables_'+conf_print[0]+'conf.txt').readlines()
+    file = open(PACKAGE_DIR / 'tables' / Path('tables_'+conf_print[0]+'conf.txt')).readlines()
     
     dizionario = {}
     conf = None
