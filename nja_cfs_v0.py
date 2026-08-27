@@ -13,7 +13,10 @@ from pprint import pprint
 import copy
 import warnings
 #import sympy   #activate this to use evaluation False in functions 
-import crystdat
+from . import crystdat
+from pathlib import Path
+PACKAGE_DIR = Path(__file__).resolve().parent
+
 from importlib.metadata import version
 if version('scipy') >= '1.17':
     sph_harm = sph_harm_y
@@ -3907,7 +3910,7 @@ def read_DWigner_quat():
                 matrix[i,:] = matrix[i-1,:]*np.sqrt(k*(k+1)-(ii+1)*((ii+1)-1))
         return matrix
 
-    filename = ['tables/tab_wignerDquat.txt', 'tables/tab_wignerDquat_coeff_t.txt']
+    filename = [str(PACKAGE_DIR / 'tables' / 'tab_wignerDquat.txt'), str(PACKAGE_DIR / 'tables' / 'tab_wignerDquat_coeff_t.txt']
     list_dict = []
     for ii in range(len(filename)):
         file = open(filename[ii]).readlines()
@@ -4058,9 +4061,9 @@ def cfp_from_file(conf):
     prime = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37]
 
     if conf[0]=='d':
-        file = open('tables/cfp_d_conf.txt', 'r').readlines()
+        file = open(PACKAGE_DIR / 'tables' / 'cfp_d_conf.txt', 'r').readlines()
     elif conf[0]=='f':
-        file = open('tables/cfp_f_conf.txt', 'r').readlines()[1:] #skip the first line
+        file = open(PACKAGE_DIR / 'tables' / 'cfp_f_conf.txt', 'r').readlines()[1:] #skip the first line
     else:
         raise ValueError('conf must be dn or fn')
     
@@ -4097,7 +4100,7 @@ def cfp_from_file(conf):
 
 def read_matrix_from_file(conf_print, closed_shell=False):
 
-    file = open('tables/tables_'+conf_print[0]+'conf.txt').readlines()
+    file = open(PACKAGE_DIR / 'tables' / Path('tables_'+conf_print[0]+'conf.txt').readlines()
     
     dizionario = {}
     conf = None
@@ -4148,7 +4151,7 @@ def read_ee_int(conf, closed_shell):
         conf_n = almost_closed_shells(conf)
         conf_str = conf[0]+str(conf_n)
 
-    file = open('tables/dic_ee_values.txt', 'r').readlines()
+    file = open(PACKAGE_DIR / 'tables' / 'dic_ee_values.txt', 'r').readlines()
     dic_ee_loaded = {}
     conf = None
     for line in file:
