@@ -311,7 +311,7 @@ def test_plot_magnetization_field():
 
         calc = nja.calculation(conf, ground_only=True, TAB=True, wordy=wordy)
         data_nja = np.copy(data)
-        data_nja[:,-1] *= (-1)
+        
         
         dic = nja.free_ion_param_f(conf)
         dic_Bkq = nja.calc_Bkq(data_nja, conf, False, True)
