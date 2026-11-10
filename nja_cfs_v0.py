@@ -2957,7 +2957,7 @@ def the_highest_L(proj, conf):
 
 #######FIGURES###########
 
-def plot_energy_levels(eigenvalues, ax=None, color='b', label=None, tolerance=0.05, offset=0, delta=0, ylabel=None):
+def plot_energy_levels(eigenvalues, ax=None, color='b', label=None, tolerance=0.05, offset=0, delta=0, ylabel=None, degenerate_fix=True):
     """
     Plot energy levels (e.g., crystal field levels), optionally labeling them on the x-axis.
 
@@ -2996,11 +2996,15 @@ def plot_energy_levels(eigenvalues, ax=None, color='b', label=None, tolerance=0.
     for level_group in grouped_levels:
         energy = level_group[0]
         n_deg = len(level_group)
-        x_positions = np.linspace(-x_offset * (n_deg - 1) / 2,
-                                  x_offset * (n_deg - 1) / 2, n_deg) + offset
-        for x in x_positions:
-            ax.hlines(y=energy, xmin=x - 0.05 + delta, xmax=x + 0.05 + delta,
-                      color=color, linewidth=2)
+        if degenerate_fix:
+            x_positions = np.linspace(-x_offset * (n_deg - 1) / 2,
+                                      x_offset * (n_deg - 1) / 2, n_deg) + offset
+            for x in x_positions:
+                ax.hlines(y=energy, xmin=x - 0.05 + delta, xmax=x + 0.05 + delta,
+                        color=color, linewidth=2)
+        else:
+            ax.hlines(y=energy, xmin=offset - 0.05 + delta, xmax=offset + 0.05 + delta,
+                       color=color, linewidth=0.5*n_deg)
 
     # Add custom label
     if label and offset not in ax._custom_xticks:
@@ -5209,8 +5213,9 @@ def r_expect(k, conf):
 
     if conf[0]=='d':
         # <r^k> from table 7.6 in A. Abragam and B. Bleaney, Electron Paramagnetic Resonance of Transition Ions, Dover, New York, 1986.
-        legenda = {'2':{'d2': 2.447,'d3': 2.070,'d4': 1.781,'d5': 1.548,'d6': 1.393,'d7': 1.251,'d8': 1.130,'d9': 1.028},
-                '4':{'d2': 13.17,'d3': 9.605,'d4': 7.211,'d5': 5.513,'d6': 4.496,'d7': 3.655,'d8': 3.003,'d9': 2.498}}
+
+        legenda = {'2':{'d1': 1.377, 'd2': 2.447,'d3': 2.070,'d4': 1.781,'d5': 1.548,'d6': 1.393,'d7': 1.251,'d8': 1.130,'d9': 1.028},
+                '4':{'d1': 3.593,'d2': 13.17,'d3': 9.605,'d4': 7.211,'d5': 5.513,'d6': 4.496,'d7': 3.655,'d8': 3.003,'d9': 2.498}}
     else:
         # <r^k> from S. Edvarsson, M. Klintenberg, J. Alloys Compd. 1998, 275–277, 230
         legenda = {'2':{'f1':1.456, 'f2':1.327, 'f3':1.222, 'f4':1.135, 'f5':1.061, 'f6':0.997, 'f7':0.942, 'f8':0.893, 'f9':0.849, 'f10':0.810, 'f11':0.773, 'f12':0.740, 'f13':0.710},
@@ -5716,6 +5721,9 @@ def read_AILFT_orca6(filename, conf, method='CASSCF', return_V=False, rotangle_V
     # rotate_V is a list of angles to rotate the V matrix
     # rotangle_V = [alpha, beta, gamma] or [q0, q1, q2, q3]
     # euler angles are in scipy convention 'ZYZ'
+
+    if method == 'ESAILFT':
+        method = 'Hermitian HEffective'
 
     from_au = 27.2113834*8065.54477
 
